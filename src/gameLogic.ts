@@ -98,7 +98,7 @@ export function performSkill(state: BattleState, skillId: string): BattleState {
   const damageMultiplier = skill.effects.damageMultiplier ?? 1.0;
   const damage = Math.max(1, Math.floor(calcDamage(atk, state.enemy.definition.stats.def) * damageMultiplier));
 
-  let newEnemyStatusEffects = [...state.enemy.statusEffects];
+  const newEnemyStatusEffects = [...state.enemy.statusEffects];
   let skillLog = `You use ${skill.name} for ${damage} damage!`;
 
   // Apply burn
@@ -190,7 +190,7 @@ function advanceToEnemyTurn(state: BattleState): BattleState {
 export function performEnemyTurn(state: BattleState): BattleState {
   if (state.phase !== 'ENEMY_TURN') return state;
 
-  let newLog = [...state.battleLog];
+  const newLog = [...state.battleLog];
   let newPlayer = { ...state.player };
   let newEnemy = { ...state.enemy };
 
