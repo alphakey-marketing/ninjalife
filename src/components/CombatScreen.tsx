@@ -31,8 +31,7 @@ export function CombatScreen() {
   const canAct = battle.phase === 'PLAYER_TURN';
   const isVictory = battle.phase === 'VICTORY';
   const isDefeat = battle.phase === 'DEFEAT';
-
-  const questDone = isVictory && battle.enemiesDefeated + 1 >= quest.targetCount;
+  const isQuestComplete = battle.phase === 'QUEST_COMPLETE';
 
   return (
     <div className="screen">
@@ -106,23 +105,32 @@ export function CombatScreen() {
               disabled={!canAct || !player.unlockedMode}
               onClick={() => dispatch({ type: 'BATTLE_TOGGLE_MODE' })}
             >
-              {player.isInMode ? '⚡ Deactivate Mode' : '⚡ Activate Mode'}
+              {player.isInMode
+                ? '⚡ Deactivate Mode'
+                : battle.modeCooldown > 0
+                  ? `⚡ Mode (CD: ${battle.modeCooldown}t)`
+                  : '⚡ Activate Mode'}
             </button>
             {availableSkills.map(skill => {
               const cd = battle.skillCooldowns.find(c => c.skillId === skill.id);
               const onCd = cd && cd.remainingTurns > 0;
               const noMd = player.stats.md < skill.mdCost;
               const noHp = player.stats.hp <= skill.hpCost;
+              const tooLowLevel = player.stats.level < skill.requiredLevel;
               return (
                 <button
                   key={skill.id}
                   className="btn"
-                  disabled={!canAct || !!onCd || noMd || noHp}
+                  disabled={!canAct || !!onCd || noMd || noHp || tooLowLevel}
                   onClick={() => dispatch({ type: 'BATTLE_SKILL', skillId: skill.id })}
                   title={skill.description}
                 >
                   ✨ {skill.name}
-                  {onCd ? ` (${cd!.remainingTurns}t)` : ` (${skill.mdCost}MD)`}
+                  {tooLowLevel
+                    ? ` (LV${skill.requiredLevel})`
+                    : onCd
+                      ? ` (${cd!.remainingTurns}t)`
+                      : ` (${skill.mdCost}MD${skill.hpCost > 0 ? `+${skill.hpCost}HP` : ''})`}
                 </button>
               );
             })}
@@ -133,8 +141,8 @@ export function CombatScreen() {
         </div>
       )}
 
-      {/* Victory */}
-      {isVictory && !questDone && (
+      {/* Victory – more enemies remain */}
+      {isVictory && !isQuestComplete && (
         <div className="card">
           <div className="text-bold text-gold" style={{ marginBottom: '8px' }}>
             ✓ Enemy Defeated! ({battle.enemiesDefeated + 1}/{quest.targetCount})
@@ -145,7 +153,8 @@ export function CombatScreen() {
         </div>
       )}
 
-      {isVictory && questDone && (
+      {/* Quest fully complete */}
+      {isQuestComplete && (
         <div className="card">
           <div className="text-bold text-gold" style={{ marginBottom: '8px' }}>
             🏆 Quest Complete!

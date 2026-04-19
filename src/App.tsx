@@ -8,11 +8,12 @@ import './App.css';
 
 function GameContent() {
   const { state } = useGame();
+  const currentNotification = state.notifications[0];
 
   return (
     <>
-      {state.notification && (
-        <div className="notification">{state.notification}</div>
+      {currentNotification && (
+        <div className="notification">{currentNotification}</div>
       )}
       {state.screen === 'HUB' && <HubScreen />}
       {state.screen === 'QUEST' && <QuestScreen />}

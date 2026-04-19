@@ -23,7 +23,7 @@ export const SKILLS: Record<string, SkillDefinition> = {
     hpCost: 0,
     mdCost: 30,
     cooldownTurn: 4,
-    requiredLevel: 1,
+    requiredLevel: 5,
     effects: {
       damageMultiplier: 2.5,
     },
@@ -35,7 +35,7 @@ export const SKILLS: Record<string, SkillDefinition> = {
     hpCost: 20,
     mdCost: 20,
     cooldownTurn: 3,
-    requiredLevel: 1,
+    requiredLevel: 8,
     effects: {
       damageMultiplier: 3.0,
     },
@@ -165,7 +165,7 @@ export const RANKS: RankDefinition[] = [
   },
 ];
 
-export const EXP_PER_LEVEL = (level: number) => level * 100;
+export const EXP_PER_LEVEL = (level: number): number => 200 + level * 80 - Math.floor(level * level * 1.5);
 export const LEVEL_CAP = 30;
 export const STAT_POINTS_PER_LEVEL = 3;
 export const ATK_PER_STR = 2;

@@ -77,6 +77,14 @@ export function performSkill(state: BattleState, skillId: string): BattleState {
   const skill: SkillDefinition = SKILLS[skillId];
   if (!skill) return state;
 
+  // Check level requirement
+  if (state.player.stats.level < skill.requiredLevel) {
+    return {
+      ...state,
+      battleLog: [...state.battleLog, `Requires Level ${skill.requiredLevel} to use ${skill.name}!`],
+    };
+  }
+
   // Check cooldown
   const cdEntry = state.skillCooldowns.find(c => c.skillId === skillId);
   if (cdEntry && cdEntry.remainingTurns > 0) {
@@ -147,15 +155,23 @@ export function toggleMode(state: BattleState): BattleState {
   }
 
   if (player.isInMode) {
-    // Deactivate
+    // Deactivate – impose 5-turn re-activation cooldown to prevent heal spam
     const newState = {
       ...state,
       player: { ...player, isInMode: false },
-      battleLog: [...state.battleLog, 'You deactivate Mode.'],
+      modeCooldown: 5,
+      battleLog: [...state.battleLog, 'You deactivate Mode. (Cooldown: 5 turns)'],
     };
     return advanceToEnemyTurn(newState);
   } else {
-    // Activate - heal 20% HP
+    // Block re-activation if cooldown is still running
+    if (state.modeCooldown > 0) {
+      return {
+        ...state,
+        battleLog: [...state.battleLog, `Mode is on cooldown for ${state.modeCooldown} more turn(s)!`],
+      };
+    }
+    // Activate - heal 20% HP once
     const healAmount = Math.floor(calcPlayerMaxHp(player) * MODE_CONFIG.instantHealPercent);
     const newHp = Math.min(calcPlayerMaxHp({ ...player, isInMode: true }), player.stats.hp + healAmount);
     const newState = {
@@ -172,19 +188,22 @@ export function toggleMode(state: BattleState): BattleState {
 }
 
 function advanceToEnemyTurn(state: BattleState): BattleState {
+  // Reduce Mode re-activation cooldown
+  let s = state.modeCooldown > 0 ? { ...state, modeCooldown: state.modeCooldown - 1 } : state;
+
   // Process mode MD drain
-  let newPlayer = { ...state.player };
+  let newPlayer = { ...s.player };
   if (newPlayer.isInMode) {
     const newMd = newPlayer.stats.md - MODE_CONFIG.mdCostPerTurn;
     if (newMd <= 0) {
       newPlayer = { ...newPlayer, isInMode: false, stats: { ...newPlayer.stats, md: 0 } };
-      state = { ...state, battleLog: [...state.battleLog, 'Mode deactivated! Out of MD.'] };
+      s = { ...s, battleLog: [...s.battleLog, 'Mode deactivated! Out of MD.'], modeCooldown: 5 };
     } else {
       newPlayer = { ...newPlayer, stats: { ...newPlayer.stats, md: newMd } };
     }
   }
 
-  return performEnemyTurn({ ...state, player: newPlayer, phase: 'ENEMY_TURN' });
+  return performEnemyTurn({ ...s, player: newPlayer, phase: 'ENEMY_TURN' });
 }
 
 export function performEnemyTurn(state: BattleState): BattleState {
@@ -355,8 +374,10 @@ export function performRankUp(player: PlayerState): PlayerState {
 
   const newRankBonus = rankBonusMap[nextRank];
 
-  // Reset level and stats, keep bloodlines and rank bonuses
-  return {
+  // Reset level and base stats; retain bloodlines and rank bonuses.
+  // stats.maxHp is always the BASE value; calcPlayerMaxHp applies any bloodline
+  // multiplier, so we start from the same base of 100 and then clamp hp properly.
+  const resetPlayer: PlayerState = {
     ...player,
     rank: nextRank,
     rankBonus: newRankBonus,
@@ -377,24 +398,31 @@ export function performRankUp(player: PlayerState): PlayerState {
     bossDefeatedThisRank: false,
     currentQuestId: null,
   };
+
+  // If a bloodline is still equipped, clamp starting HP to its effective maximum
+  // (e.g. Void reduces max HP by 20%, so hp must start at 80, not 100).
+  const effectiveMaxHp = calcPlayerMaxHp(resetPlayer);
+  return {
+    ...resetPlayer,
+    stats: { ...resetPlayer.stats, hp: effectiveMaxHp },
+  };
 }
 
 export function equipBloodline(player: PlayerState, bloodlineId: string): PlayerState {
   const owned = player.ownedBloodlines.find(b => b.id === bloodlineId);
   if (!owned) return player;
-  
-  // Recalculate HP with new bloodline
+
+  // Keep stats.maxHp as the BASE value – calcPlayerMaxHp() applies the bloodline
+  // multiplier on top of it, so we must NOT bake the multiplier into stats.maxHp.
   const newPlayer = { ...player, equippedBloodlineId: bloodlineId };
-  const newMaxHp = calcPlayerMaxHp(newPlayer);
-  const oldMaxHp = calcPlayerMaxHp(player);
-  const hpDiff = newMaxHp - oldMaxHp;
-  
+  const newEffectiveMaxHp = calcPlayerMaxHp(newPlayer);
+
   return {
     ...newPlayer,
     stats: {
       ...newPlayer.stats,
-      maxHp: newMaxHp,
-      hp: Math.min(newPlayer.stats.hp + hpDiff, newMaxHp),
+      // Clamp current HP to the new effective maximum
+      hp: Math.min(newPlayer.stats.hp, newEffectiveMaxHp),
     },
   };
 }

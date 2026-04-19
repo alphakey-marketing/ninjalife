@@ -1,13 +1,13 @@
 import { useGame } from '../gameStore';
 import { canRankUp, calcPlayerMaxHp } from '../gameLogic';
-import { BLOODLINES } from '../constants';
+import { BLOODLINES, EXP_PER_LEVEL } from '../constants';
 
 export function HubScreen() {
   const { state, dispatch } = useGame();
   const { player } = state;
   const equipped = player.equippedBloodlineId ? BLOODLINES[player.equippedBloodlineId] : null;
   const maxHp = calcPlayerMaxHp(player);
-  const expNeeded = player.stats.level < 30 ? player.stats.level * 100 : 0;
+  const expNeeded = player.stats.level < 30 ? EXP_PER_LEVEL(player.stats.level) : 0;
   const hpPct = Math.max(0, Math.min(100, (player.stats.hp / maxHp) * 100));
   const mdPct = Math.max(0, Math.min(100, (player.stats.md / player.stats.maxMd) * 100));
   const expPct = expNeeded > 0 ? Math.max(0, Math.min(100, (player.stats.exp / expNeeded) * 100)) : 100;

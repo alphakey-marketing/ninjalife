@@ -65,11 +65,11 @@ export function SpinScreen() {
           {isSpinning ? '🌀 Spinning...' : '🌀 SPIN! (100 Ryo)'}
         </button>
 
-        {state.notification && (
+        {state.notifications[0] && (
           <div className="spin-result">
-            <span className={state.notification.includes('LEGENDARY') || state.notification.includes('Void') ? 'text-purple text-bold' :
-              state.notification.includes('RARE') || state.notification.includes('Storm') ? 'text-blue text-bold' : ''}>
-              {state.notification}
+            <span className={state.notifications[0].includes('LEGENDARY') || state.notifications[0].includes('Void') ? 'text-purple text-bold' :
+              state.notifications[0].includes('RARE') || state.notifications[0].includes('Storm') ? 'text-blue text-bold' : ''}>
+              {state.notifications[0]}
             </span>
           </div>
         )}

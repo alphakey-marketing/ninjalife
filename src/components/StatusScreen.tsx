@@ -1,5 +1,5 @@
 import { useGame } from '../gameStore';
-import { BLOODLINES, SKILLS } from '../constants';
+import { BLOODLINES, EXP_PER_LEVEL, SKILLS } from '../constants';
 import { calcPlayerAtk, calcPlayerDef, calcPlayerMaxHp } from '../gameLogic';
 
 export function StatusScreen() {
@@ -24,7 +24,7 @@ export function StatusScreen() {
       <div className="card">
         <div className="card-title">Core Stats</div>
         <div className="stat-row"><span className="stat-label">Level</span><span className="stat-value">{player.stats.level} / 30</span></div>
-        <div className="stat-row"><span className="stat-label">EXP</span><span className="stat-value">{player.stats.exp} / {player.stats.level < 30 ? player.stats.level * 100 : 'MAX'}</span></div>
+        <div className="stat-row"><span className="stat-label">EXP</span><span className="stat-value">{player.stats.exp} / {player.stats.level < 30 ? EXP_PER_LEVEL(player.stats.level) : 'MAX'}</span></div>
         <div className="stat-row"><span className="stat-label">HP</span><span className="stat-value">{player.stats.hp} / {effMaxHp}</span></div>
         <div className="stat-row"><span className="stat-label">MD</span><span className="stat-value">{player.stats.md} / {player.stats.maxMd}</span></div>
         <div className="stat-row"><span className="stat-label">ATK (base)</span><span className="stat-value">{player.stats.atk}</span></div>

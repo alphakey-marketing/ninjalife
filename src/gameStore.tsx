@@ -17,7 +17,7 @@ interface GameState {
   screen: Screen;
   player: PlayerState;
   battle: BattleState | null;
-  notification: string | null;
+  notifications: string[];
 }
 
 type GameAction =
@@ -35,7 +35,7 @@ type GameAction =
   | { type: 'RANK_UP' }
   | { type: 'SAVE_GAME' }
   | { type: 'LOAD_GAME' }
-  | { type: 'SET_NOTIFICATION'; message: string | null };
+  | { type: 'DEQUEUE_NOTIFICATION' };
 
 const initialPlayer: PlayerState = {
   name: 'Ninja',
@@ -53,7 +53,7 @@ const initialPlayer: PlayerState = {
     maxMd: 50,
   },
   statPoints: { unspent: 0, str: 0, vit: 0, foc: 0 },
-  ryo: 200,
+  ryo: 0,
   ownedBloodlines: [],
   equippedBloodlineId: null,
   unlockedMode: false,
@@ -66,8 +66,12 @@ const initialState: GameState = {
   screen: 'HUB',
   player: initialPlayer,
   battle: null,
-  notification: null,
+  notifications: [],
 };
+
+function notify(state: GameState, message: string): GameState {
+  return { ...state, notifications: [...state.notifications, message] };
+}
 
 function createBattle(player: PlayerState, questId: string): BattleState {
   const quest = QUESTS.find(q => q.id === questId)!;
@@ -85,19 +89,20 @@ function createBattle(player: PlayerState, questId: string): BattleState {
     phase: 'PLAYER_TURN',
     enemiesDefeated: 0,
     questId,
+    modeCooldown: 0,
   };
 }
 
 function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case 'NAVIGATE':
-      return { ...state, screen: action.screen, notification: null };
+      return { ...state, screen: action.screen };
 
     case 'START_QUEST': {
       const quest = QUESTS.find(q => q.id === action.questId);
       if (!quest) return state;
       if (state.player.stats.level < quest.requiredLevel) {
-        return { ...state, notification: `Requires Level ${quest.requiredLevel}!` };
+        return notify(state, `Requires Level ${quest.requiredLevel}!`);
       }
       const battle = createBattle(state.player, action.questId);
       return {
@@ -127,12 +132,14 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'BATTLE_RUN': {
+      // Use the in-battle player state so HP/MD changes from combat are preserved
+      const battlePlayer = state.battle ? state.battle.player : state.player;
       return {
         ...state,
         screen: 'HUB',
         battle: null,
-        notification: 'You fled the battle!',
-        player: { ...state.player, currentQuestId: null },
+        player: { ...battlePlayer, currentQuestId: null, isInMode: false },
+        notifications: [...state.notifications, 'You fled the battle!'],
       };
     }
 
@@ -140,25 +147,29 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (!state.battle || state.battle.phase !== 'VICTORY') return state;
       const quest = QUESTS.find(q => q.id === state.battle!.questId)!;
       const newDefeated = state.battle.enemiesDefeated + 1;
+      // Always sync the authoritative player state from the battle snapshot
+      const updatedPlayer = { ...state.battle.player };
 
       if (newDefeated >= quest.targetCount) {
-        // Quest complete - go to collect reward phase
+        // All enemies defeated – transition to dedicated QUEST_COMPLETE phase
         return {
           ...state,
+          player: updatedPlayer,
           battle: {
             ...state.battle,
+            player: updatedPlayer,
             enemiesDefeated: newDefeated,
-            phase: 'VICTORY',
-            battleLog: [...state.battle.battleLog, `Quest complete! Collect your reward.`],
+            phase: 'QUEST_COMPLETE',
+            battleLog: [...state.battle.battleLog, 'Quest complete! Collect your reward.'],
           },
         };
       }
 
-      // Spawn next enemy
+      // Spawn the next enemy in the series
       const enemyDef = ENEMIES[quest.targetEnemyId];
-      const updatedPlayer = { ...state.battle.player };
       return {
         ...state,
+        player: updatedPlayer,
         battle: {
           ...state.battle,
           player: updatedPlayer,
@@ -187,6 +198,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         ryo: player.ryo + quest.reward.ryo,
         bossDefeatedThisRank: quest.type === 'BOSS' ? true : player.bossDefeatedThisRank,
         currentQuestId: null,
+        isInMode: false,
       };
 
       player = checkLevelUp(player);
@@ -196,30 +208,24 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         screen: 'HUB',
         battle: null,
         player,
-        notification: `Quest Complete! +${quest.reward.exp} EXP +${quest.reward.ryo} Ryo`,
+        notifications: [...state.notifications, `Quest Complete! +${quest.reward.exp} EXP +${quest.reward.ryo} Ryo`],
       };
     }
 
     case 'SPIN': {
       const { player: newPlayer, result, bloodlineId } = performSpin(state.player);
       if (!bloodlineId) {
-        return { ...state, notification: result };
+        return notify(state, result);
       }
-      return {
-        ...state,
-        player: newPlayer,
-        notification: result,
-      };
+      return notify({ ...state, player: newPlayer }, result);
     }
 
     case 'EQUIP_BLOODLINE': {
       const newPlayer = equipBloodline(state.player, action.bloodlineId);
-      // Check mode unlock
       const unlockedMode = newPlayer.stats.level >= 10 && !!newPlayer.equippedBloodlineId;
       return {
-        ...state,
+        ...notify(state, `Equipped ${action.bloodlineId} bloodline!`),
         player: { ...newPlayer, unlockedMode: unlockedMode || newPlayer.unlockedMode },
-        notification: `Equipped ${action.bloodlineId} bloodline!`,
       };
     }
 
@@ -230,18 +236,18 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'RANK_UP': {
       if (!canRankUp(state.player)) {
-        return { ...state, notification: 'Cannot rank up yet! Need LV30 and BOSS cleared.' };
+        return notify(state, 'Cannot rank up yet! Need LV30 and BOSS cleared.');
       }
       const newPlayer = performRankUp(state.player);
-      return { ...state, player: newPlayer, notification: `Ranked up to ${newPlayer.rank}!` };
+      return notify({ ...state, player: newPlayer }, `Ranked up to Rank ${newPlayer.rank}!`);
     }
 
     case 'SAVE_GAME': {
       try {
         localStorage.setItem('ninjalife_save', JSON.stringify(state.player));
-        return { ...state, notification: 'Game saved!' };
+        return notify(state, 'Game saved!');
       } catch {
-        return { ...state, notification: 'Failed to save!' };
+        return notify(state, 'Failed to save!');
       }
     }
 
@@ -250,16 +256,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         const saved = localStorage.getItem('ninjalife_save');
         if (saved) {
           const player = JSON.parse(saved) as PlayerState;
-          return { ...state, player, screen: 'HUB', battle: null, notification: 'Game loaded!' };
+          return notify({ ...state, player, screen: 'HUB', battle: null }, 'Game loaded!');
         }
-        return { ...state, notification: 'No save found!' };
+        return notify(state, 'No save found!');
       } catch {
-        return { ...state, notification: 'Failed to load!' };
+        return notify(state, 'Failed to load!');
       }
     }
 
-    case 'SET_NOTIFICATION':
-      return { ...state, notification: action.message };
+    case 'DEQUEUE_NOTIFICATION':
+      return { ...state, notifications: state.notifications.slice(1) };
 
     default:
       return state;
@@ -274,13 +280,13 @@ const GameContext = createContext<{
 export function GameProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(gameReducer, initialState);
 
-  // Auto-clear notifications
+  // Auto-dequeue the front notification after 3 seconds so queued ones show in order
   useEffect(() => {
-    if (state.notification) {
-      const timer = setTimeout(() => dispatch({ type: 'SET_NOTIFICATION', message: null }), 3000);
+    if (state.notifications.length > 0) {
+      const timer = setTimeout(() => dispatch({ type: 'DEQUEUE_NOTIFICATION' }), 3000);
       return () => clearTimeout(timer);
     }
-  }, [state.notification]);
+  }, [state.notifications]);
 
   return (
     <GameContext.Provider value={{ state, dispatch }}>

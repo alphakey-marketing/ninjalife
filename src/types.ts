@@ -161,7 +161,8 @@ export interface BattleState {
   skillCooldowns: SkillCooldownState[];
   turnNumber: number;
   battleLog: string[];
-  phase: 'PLAYER_TURN' | 'ENEMY_TURN' | 'VICTORY' | 'DEFEAT';
+  phase: 'PLAYER_TURN' | 'ENEMY_TURN' | 'VICTORY' | 'DEFEAT' | 'QUEST_COMPLETE';
   enemiesDefeated: number;
   questId: string;
+  modeCooldown: number;
 }
