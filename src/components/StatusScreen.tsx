@@ -1,14 +1,17 @@
 import { useGame } from '../gameStore';
 import { BLOODLINES, EXP_PER_LEVEL, SKILLS } from '../constants';
-import { calcPlayerAtk, calcPlayerDef, calcPlayerMaxHp } from '../gameLogic';
+import { calcMdRegen, calcPlayerAtk, calcPlayerDef, calcPlayerMaxHp, calcPlayerSpd } from '../gameLogic';
 
 export function StatusScreen() {
   const { state, dispatch } = useGame();
   const { player } = state;
   const equipped = player.equippedBloodlineId ? BLOODLINES[player.equippedBloodlineId] : null;
+  const equippedMastery = player.ownedBloodlines.find(b => b.id === player.equippedBloodlineId)?.mastery ?? 0;
   const effAtk = calcPlayerAtk(player);
   const effDef = calcPlayerDef(player);
   const effMaxHp = calcPlayerMaxHp(player);
+  const effSpd = calcPlayerSpd(player);
+  const mdRegen = calcMdRegen(player);
 
   const availableSkills = equipped ? equipped.skillIds.map(id => SKILLS[id]) : [];
 
@@ -27,11 +30,12 @@ export function StatusScreen() {
         <div className="stat-row"><span className="stat-label">EXP</span><span className="stat-value">{player.stats.exp} / {player.stats.level < 30 ? EXP_PER_LEVEL(player.stats.level) : 'MAX'}</span></div>
         <div className="stat-row"><span className="stat-label">HP</span><span className="stat-value">{player.stats.hp} / {effMaxHp}</span></div>
         <div className="stat-row"><span className="stat-label">MD</span><span className="stat-value">{player.stats.md} / {player.stats.maxMd}</span></div>
+        <div className="stat-row"><span className="stat-label">MD Regen / turn</span><span className="stat-value-gold">+{mdRegen}</span></div>
         <div className="stat-row"><span className="stat-label">ATK (base)</span><span className="stat-value">{player.stats.atk}</span></div>
         <div className="stat-row"><span className="stat-label">ATK (effective)</span><span className="stat-value-gold">{effAtk.toFixed(1)}</span></div>
         <div className="stat-row"><span className="stat-label">DEF (base)</span><span className="stat-value">{player.stats.def}</span></div>
         <div className="stat-row"><span className="stat-label">DEF (effective)</span><span className="stat-value-gold">{effDef.toFixed(1)}</span></div>
-        <div className="stat-row"><span className="stat-label">SPD</span><span className="stat-value">{player.stats.spd}</span></div>
+        <div className="stat-row"><span className="stat-label">SPD (effective)</span><span className="stat-value-gold">{effSpd}</span></div>
         <div className="stat-row"><span className="stat-label">Ryo</span><span className="stat-value-gold">{player.ryo} 💰</span></div>
       </div>
 
@@ -60,7 +64,7 @@ export function StatusScreen() {
             </div>
             <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div className="text-bold">FOC (Focus) → +10 Max MD</div>
+                <div className="text-bold">FOC (Focus) → +10 Max MD, +0.5 MD/turn</div>
                 <div className="text-small text-gray">Current: {player.statPoints.foc} allocated</div>
               </div>
               <button className="btn btn-primary" onClick={() => dispatch({ type: 'ALLOCATE_STAT', stat: 'foc' })}>
@@ -76,13 +80,30 @@ export function StatusScreen() {
         <div className="card-title">🩸 Bloodline</div>
         {equipped ? (
           <>
-            <div className={`rarity-${equipped.rarity.toLowerCase()} text-bold`}>{equipped.name} [{equipped.rarity}]</div>
+            <div className={`rarity-${equipped.rarity.toLowerCase()} text-bold`}>
+              {equipped.name} [{equipped.rarity}]
+              {equippedMastery > 1 && <span className="text-gold"> ★{equippedMastery}</span>}
+            </div>
             <div className="text-small text-gray" style={{ marginTop: '4px' }}>{equipped.description}</div>
             <div className="text-small" style={{ marginTop: '8px' }}>
               <span className="text-gray">Passive: </span>
-              {equipped.passive.atkMultiplier && <span>ATK ×{equipped.passive.atkMultiplier} </span>}
+              {equipped.passive.atkMultiplier && (
+                <span>ATK ×{(equipped.passive.atkMultiplier + Math.max(0, equippedMastery - 1) * 0.02).toFixed(2)} </span>
+              )}
               {equipped.passive.hpMultiplier && <span>HP ×{equipped.passive.hpMultiplier} </span>}
-              {equipped.passive.critChanceBonus && <span>Crit +{(equipped.passive.critChanceBonus * 100).toFixed(0)}% </span>}
+              {equipped.passive.critChanceBonus && (
+                <span>Crit +{((equipped.passive.critChanceBonus + Math.max(0, equippedMastery - 1) * 0.02) * 100).toFixed(0)}% </span>
+              )}
+              {equipped.passive.defMultiplier && (
+                <span>DEF ×{(equipped.passive.defMultiplier + Math.max(0, equippedMastery - 1) * 0.02).toFixed(2)} </span>
+              )}
+              {equipped.passive.spdBonus && (
+                <span>SPD +{equipped.passive.spdBonus + Math.max(0, equippedMastery - 1)} </span>
+              )}
+              {equipped.passive.mdRegenBonus && (
+                <span>MDRegen +{equipped.passive.mdRegenBonus + Math.max(0, equippedMastery - 1)} </span>
+              )}
+              {equippedMastery > 1 && <span className="text-gold">(mastery {equippedMastery})</span>}
             </div>
           </>
         ) : (
@@ -96,13 +117,20 @@ export function StatusScreen() {
           <div className="card-title">✨ Skills</div>
           {availableSkills.map(skill => (
             <div key={skill.id} style={{ marginBottom: '10px', padding: '8px', border: '1px solid #2a2a3a', borderRadius: '4px' }}>
-              <div className="text-bold">{skill.name}</div>
+              <div className="text-bold">
+                {skill.name}
+                {player.stats.level < skill.requiredLevel && (
+                  <span className="text-red text-small"> 🔒 LV{skill.requiredLevel}</span>
+                )}
+              </div>
               <div className="text-small text-gray">{skill.description}</div>
               <div className="flex-row text-small" style={{ marginTop: '4px' }}>
                 {skill.mdCost > 0 && <span className="text-blue">MD: {skill.mdCost}</span>}
                 {skill.hpCost > 0 && <span className="text-red">HP: {skill.hpCost}</span>}
                 <span className="text-gray">CD: {skill.cooldownTurn}t</span>
-                {skill.effects.damageMultiplier && <span className="text-gold">DMG: ×{skill.effects.damageMultiplier}</span>}
+                {(skill.effects.damageMultiplier ?? 0) > 0 && <span className="text-gold">DMG: ×{skill.effects.damageMultiplier}</span>}
+                {skill.effects.healSelfPercent && <span className="text-green">Heal: {(skill.effects.healSelfPercent * 100).toFixed(0)}%HP</span>}
+                {skill.effects.mdRestore && <span className="text-blue">Restore: {skill.effects.mdRestore}MD</span>}
                 {skill.effects.burnChance && <span className="text-red">Burn: {(skill.effects.burnChance * 100).toFixed(0)}%</span>}
               </div>
             </div>
@@ -127,6 +155,10 @@ export function StatusScreen() {
           <span className={player.bossDefeatedThisRank ? 'text-green' : 'text-red'}>
             {player.bossDefeatedThisRank ? '✓ Yes' : '✗ No'}
           </span>
+        </div>
+        <div className="stat-row">
+          <span className="stat-label">Quests Completed</span>
+          <span className="stat-value">{player.completedQuestIds.length}</span>
         </div>
       </div>
     </div>

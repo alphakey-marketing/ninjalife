@@ -44,6 +44,7 @@ export interface PlayerState {
   isInMode: boolean;
   currentQuestId: string | null;
   bossDefeatedThisRank: boolean;
+  completedQuestIds: string[];
 }
 
 export interface SkillEffectNumbers {
@@ -53,6 +54,8 @@ export interface SkillEffectNumbers {
   burnChance?: number;
   burnDamagePerTurn?: number;
   burnDuration?: number;
+  healSelfPercent?: number;
+  mdRestore?: number;
 }
 
 export interface SkillDefinition {
@@ -75,6 +78,9 @@ export interface BloodlineDefinition {
     atkMultiplier?: number;
     hpMultiplier?: number;
     critChanceBonus?: number;
+    defMultiplier?: number;
+    spdBonus?: number;
+    mdRegenBonus?: number;
   };
   skillIds: string[];
 }
@@ -127,6 +133,8 @@ export interface EnemyDefinition {
   name: string;
   description: string;
   stats: EnemyStats;
+  specialAbility?: 'GUARD' | 'CHARGE';
+  specialAbilityChance?: number;
 }
 
 export interface RankDefinition {
@@ -157,6 +165,8 @@ export interface BattleState {
     definition: EnemyDefinition;
     currentHp: number;
     statusEffects: StatusEffect[];
+    isGuarding: boolean;
+    chargeReady: boolean;
   };
   skillCooldowns: SkillCooldownState[];
   turnNumber: number;

@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import type { BattleState, PlayerState, Screen } from './types';
-import { ENEMIES, QUESTS } from './constants';
+import { ENEMIES, QUESTS, SAVE_VERSION } from './constants';
 import {
   applyStatPoint,
   canRankUp,
+  calcEnemyDamage,
   checkLevelUp,
+  enemyHasFirstStrike,
   equipBloodline,
   performAttack,
   performRankUp,
@@ -60,6 +62,7 @@ const initialPlayer: PlayerState = {
   isInMode: false,
   currentQuestId: null,
   bossDefeatedThisRank: false,
+  completedQuestIds: [],
 };
 
 const initialState: GameState = {
@@ -73,19 +76,46 @@ function notify(state: GameState, message: string): GameState {
   return { ...state, notifications: [...state.notifications, message] };
 }
 
+function autoSave(player: PlayerState): void {
+  try {
+    localStorage.setItem('ninjalife_save', JSON.stringify({ saveVersion: SAVE_VERSION, player }));
+  } catch { /* silent fail */ }
+}
+
 function createBattle(player: PlayerState, questId: string): BattleState {
   const quest = QUESTS.find(q => q.id === questId)!;
   const enemyDef = ENEMIES[quest.targetEnemyId];
+  const battleLog: string[] = [`A wild ${enemyDef.name} appears!`];
+  let initialPlayer = { ...player };
+
+  // SPD initiative: enemy with significantly higher SPD gets a free pre-emptive strike
+  if (enemyHasFirstStrike(player, enemyDef.stats.spd)) {
+    const preDamage = calcEnemyDamage(enemyDef.stats.atk, player.stats.def);
+    // Pre-emptive can't kill the player outright
+    const newHp = Math.max(1, player.stats.hp - preDamage);
+    initialPlayer = { ...player, stats: { ...player.stats, hp: newHp } };
+    battleLog.push(`⚡ ${enemyDef.name} is faster! Pre-emptive strike for ${preDamage} damage!`);
+  }
+
+  // Announce enemy abilities
+  if (enemyDef.specialAbility === 'CHARGE') {
+    battleLog.push(`⚠ ${enemyDef.name} may charge up powerful attacks!`);
+  } else if (enemyDef.specialAbility === 'GUARD') {
+    battleLog.push(`⚠ ${enemyDef.name} may guard against your strikes!`);
+  }
+
   return {
-    player,
+    player: initialPlayer,
     enemy: {
       definition: enemyDef,
       currentHp: enemyDef.stats.maxHp,
       statusEffects: [],
+      isGuarding: false,
+      chargeReady: false,
     },
     skillCooldowns: [],
     turnNumber: 1,
-    battleLog: [`A wild ${enemyDef.name} appears!`],
+    battleLog,
     phase: 'PLAYER_TURN',
     enemiesDefeated: 0,
     questId,
@@ -132,13 +162,19 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'BATTLE_RUN': {
-      // Use the in-battle player state so HP/MD changes from combat are preserved
       const battlePlayer = state.battle ? state.battle.player : state.player;
+      // Restore full MD on retreat so the player isn't punished by resource drought next quest
+      const restoredPlayer: PlayerState = {
+        ...battlePlayer,
+        currentQuestId: null,
+        isInMode: false,
+        stats: { ...battlePlayer.stats, md: battlePlayer.stats.maxMd },
+      };
       return {
         ...state,
         screen: 'HUB',
         battle: null,
-        player: { ...battlePlayer, currentQuestId: null, isInMode: false },
+        player: restoredPlayer,
         notifications: [...state.notifications, 'You fled the battle!'],
       };
     }
@@ -147,11 +183,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (!state.battle || state.battle.phase !== 'VICTORY') return state;
       const quest = QUESTS.find(q => q.id === state.battle!.questId)!;
       const newDefeated = state.battle.enemiesDefeated + 1;
-      // Always sync the authoritative player state from the battle snapshot
       const updatedPlayer = { ...state.battle.player };
 
       if (newDefeated >= quest.targetCount) {
-        // All enemies defeated – transition to dedicated QUEST_COMPLETE phase
         return {
           ...state,
           player: updatedPlayer,
@@ -165,7 +199,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         };
       }
 
-      // Spawn the next enemy in the series
       const enemyDef = ENEMIES[quest.targetEnemyId];
       return {
         ...state,
@@ -177,6 +210,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             definition: enemyDef,
             currentHp: enemyDef.stats.maxHp,
             statusEffects: [],
+            isGuarding: false,
+            chargeReady: false,
           },
           skillCooldowns: [],
           turnNumber: state.battle.turnNumber + 1,
@@ -190,7 +225,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'COLLECT_QUEST_REWARD': {
       if (!state.battle) return state;
       const quest = QUESTS.find(q => q.id === state.battle!.questId)!;
+      const preRewardLevel = state.battle.player.stats.level;
       let player = { ...state.battle.player };
+
+      // Mark quest as completed (first-time tracking)
+      const completedQuestIds = player.completedQuestIds.includes(quest.id)
+        ? player.completedQuestIds
+        : [...player.completedQuestIds, quest.id];
 
       player = {
         ...player,
@@ -199,17 +240,30 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         bossDefeatedThisRank: quest.type === 'BOSS' ? true : player.bossDefeatedThisRank,
         currentQuestId: null,
         isInMode: false,
+        // Restore full MD on quest complete
+        completedQuestIds,
       };
+      player = { ...player, stats: { ...player.stats, md: player.stats.maxMd } };
 
       player = checkLevelUp(player);
 
-      return {
+      let finalState: GameState = {
         ...state,
         screen: 'HUB',
         battle: null,
         player,
         notifications: [...state.notifications, `Quest Complete! +${quest.reward.exp} EXP +${quest.reward.ryo} Ryo`],
       };
+
+      // Level-up notifications for each level gained
+      for (let lv = preRewardLevel + 1; lv <= player.stats.level; lv++) {
+        finalState = notify(finalState, `⬆ Level Up! Now Level ${lv}!`);
+      }
+
+      // Auto-save after quest completion
+      autoSave(finalState.player);
+
+      return finalState;
     }
 
     case 'SPIN': {
@@ -244,7 +298,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'SAVE_GAME': {
       try {
-        localStorage.setItem('ninjalife_save', JSON.stringify(state.player));
+        localStorage.setItem('ninjalife_save', JSON.stringify({ saveVersion: SAVE_VERSION, player: state.player }));
         return notify(state, 'Game saved!');
       } catch {
         return notify(state, 'Failed to save!');
@@ -255,7 +309,14 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       try {
         const saved = localStorage.getItem('ninjalife_save');
         if (saved) {
-          const player = JSON.parse(saved) as PlayerState;
+          const raw = JSON.parse(saved);
+          // Support both new format { saveVersion, player } and legacy format (raw player)
+          const rawPlayer = (raw.saveVersion !== undefined ? raw.player : raw) as PlayerState;
+          // Patch any missing fields added in later save versions
+          const player: PlayerState = {
+            ...rawPlayer,
+            completedQuestIds: rawPlayer.completedQuestIds ?? [],
+          };
           return notify({ ...state, player, screen: 'HUB', battle: null }, 'Game loaded!');
         }
         return notify(state, 'No save found!');

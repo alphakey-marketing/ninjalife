@@ -1,5 +1,5 @@
 import { useGame } from '../gameStore';
-import { QUESTS } from '../constants';
+import { ENEMIES, QUESTS } from '../constants';
 
 const questTypeLabel: Record<string, string> = {
   GRIND: '⚔ GRIND',
@@ -23,6 +23,8 @@ export function QuestScreen() {
         <div className="card-title">Available Quests</div>
         {QUESTS.map(quest => {
           const isLocked = player.stats.level < quest.requiredLevel;
+          const isCompleted = player.completedQuestIds.includes(quest.id);
+          const enemyDef = ENEMIES[quest.targetEnemyId];
           return (
             <div
               key={quest.id}
@@ -30,13 +32,18 @@ export function QuestScreen() {
               onClick={() => !isLocked && dispatch({ type: 'START_QUEST', questId: quest.id })}
             >
               <div className="flex-row" style={{ justifyContent: 'space-between' }}>
-                <span className="text-bold">{quest.name}</span>
+                <span className="text-bold">
+                  {quest.name}
+                  {isCompleted && <span className="text-green"> ✓</span>}
+                </span>
                 <span className="text-small">{questTypeLabel[quest.type]}</span>
               </div>
               <div className="text-small text-gray" style={{ marginTop: '4px' }}>{quest.description}</div>
               <div className="flex-row text-small" style={{ marginTop: '6px', justifyContent: 'space-between' }}>
                 <span>
-                  Defeat {quest.targetCount}x {quest.targetEnemyId.replace('_', ' ')}
+                  Defeat {quest.targetCount}× {enemyDef?.name ?? quest.targetEnemyId}
+                  {enemyDef?.specialAbility === 'GUARD' && <span className="text-gray"> 🛡</span>}
+                  {enemyDef?.specialAbility === 'CHARGE' && <span className="text-gray"> ⚡</span>}
                 </span>
                 <span className="text-gold">+{quest.reward.exp} EXP +{quest.reward.ryo} Ryo</span>
               </div>

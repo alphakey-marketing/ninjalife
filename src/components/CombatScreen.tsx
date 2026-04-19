@@ -73,6 +73,8 @@ export function CombatScreen() {
             <div className="text-bold" style={{ marginBottom: '6px' }}>
               {enemy.definition.name}
               {enemy.statusEffects.find(e => e.type === 'BURN') && <span className="text-red"> 🔥</span>}
+              {enemy.isGuarding && <span className="text-blue"> 🛡</span>}
+              {enemy.chargeReady && <span className="text-gold"> ⚡</span>}
             </div>
             <div className="hp-bar-container">
               <div className="hp-bar-label">
