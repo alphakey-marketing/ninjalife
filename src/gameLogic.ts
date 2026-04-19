@@ -172,8 +172,9 @@ export function toggleMode(state: BattleState): BattleState {
       };
     }
     // Activate - heal 20% HP once
-    const healAmount = Math.floor(calcPlayerMaxHp(player) * MODE_CONFIG.instantHealPercent);
-    const newHp = Math.min(calcPlayerMaxHp({ ...player, isInMode: true }), player.stats.hp + healAmount);
+    const effectiveMaxHp = calcPlayerMaxHp(player);
+    const healAmount = Math.floor(effectiveMaxHp * MODE_CONFIG.instantHealPercent);
+    const newHp = Math.min(effectiveMaxHp, player.stats.hp + healAmount);
     const newState = {
       ...state,
       player: {
