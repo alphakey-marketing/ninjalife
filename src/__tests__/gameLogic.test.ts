@@ -14,9 +14,10 @@ import {
   hasCritBonus,
   performAttack,
   performRankUp,
+  performRest,
 } from '../gameLogic';
 import type { BattleState, PlayerState } from '../types';
-import { EXP_PER_LEVEL, MD_REGEN_BASE } from '../constants';
+import { CLINIC_COSTS, EXP_PER_LEVEL, MD_REGEN_BASE, QUESTS } from '../constants';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -395,5 +396,85 @@ describe('performAttack', () => {
   it('does nothing outside of PLAYER_TURN phase', () => {
     const battle = { ...makeBattle(), phase: 'ENEMY_TURN' as const };
     expect(performAttack(battle)).toBe(battle);
+  });
+});
+
+// ── performRest ───────────────────────────────────────────────────────────────
+
+describe('performRest (FREE)', () => {
+  it('restores 50% HP and Chakra on free rest', () => {
+    const player = makePlayer({ stats: { ...makePlayer().stats, hp: 40, md: 10 } });
+    const { player: result, success } = performRest(player, 'FREE');
+    expect(success).toBe(true);
+    expect(result.stats.hp).toBe(Math.min(100, 40 + Math.floor(100 * 0.5)));
+    expect(result.stats.md).toBe(Math.min(50, 10 + Math.floor(50 * 0.5)));
+  });
+
+  it('marks freeRestUsedToday after use', () => {
+    const player = makePlayer();
+    const { player: result } = performRest(player, 'FREE');
+    expect(result.freeRestUsedToday).toBe(true);
+  });
+
+  it('fails when free rest already used today', () => {
+    const player = makePlayer({ freeRestUsedToday: true });
+    const { success, player: unchanged } = performRest(player, 'FREE');
+    expect(success).toBe(false);
+    expect(unchanged).toBe(player);
+  });
+
+  it('does not exceed max HP or Chakra', () => {
+    const player = makePlayer({ stats: { ...makePlayer().stats, hp: 90, md: 45 } });
+    const { player: result } = performRest(player, 'FREE');
+    expect(result.stats.hp).toBeLessThanOrEqual(100);
+    expect(result.stats.md).toBeLessThanOrEqual(50);
+  });
+});
+
+describe('performRest (PAY)', () => {
+  it('fully restores HP and Chakra', () => {
+    const player = makePlayer({ ryo: 200, stats: { ...makePlayer().stats, hp: 20, md: 5 } });
+    const { player: result, success } = performRest(player, 'PAY');
+    expect(success).toBe(true);
+    expect(result.stats.hp).toBe(100); // full maxHp
+    expect(result.stats.md).toBe(50);  // full maxMd
+  });
+
+  it('deducts the correct Ryo cost for LV1-10', () => {
+    const cost = CLINIC_COSTS.find(b => 1 <= b.maxLevel)!.cost;
+    const player = makePlayer({ ryo: cost, stats: { ...makePlayer().stats, level: 1 } });
+    const { player: result } = performRest(player, 'PAY');
+    expect(result.ryo).toBe(0);
+  });
+
+  it('fails when player has insufficient Ryo', () => {
+    const player = makePlayer({ ryo: 0 });
+    const { success, player: unchanged } = performRest(player, 'PAY');
+    expect(success).toBe(false);
+    expect(unchanged).toBe(player);
+  });
+});
+
+// ── New quests ────────────────────────────────────────────────────────────────
+
+describe('New quests (phase 1.3)', () => {
+  it('CHUNIN_QUEST exists with correct properties', () => {
+    const quest = QUESTS.find(q => q.id === 'CHUNIN_QUEST');
+    expect(quest).toBeDefined();
+    expect(quest!.requiredLevel).toBe(15);
+    expect(quest!.targetCount).toBe(2);
+    expect(quest!.targetEnemyId).toBe('ELITE_NINJA');
+    expect(quest!.reward.exp).toBe(420);
+    expect(quest!.reward.ryo).toBe(290);
+  });
+
+  it('BOSS_QUEST (四尾覺醒之戰) exists with correct properties', () => {
+    const quest = QUESTS.find(q => q.id === 'BOSS_QUEST');
+    expect(quest).toBeDefined();
+    expect(quest!.type).toBe('BOSS');
+    expect(quest!.requiredLevel).toBe(25);
+    expect(quest!.targetEnemyId).toBe('GUARDIAN');
+    expect(quest!.reward.exp).toBe(700);
+    expect(quest!.reward.ryo).toBe(500);
   });
 });
