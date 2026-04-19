@@ -25,19 +25,19 @@ export function SpinScreen() {
     <div className="screen">
       <div className="header-bar">
         <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'HUB' })}>← Back</button>
-        <span className="game-title" style={{ fontSize: '1.1rem' }}>🌀 Bloodline SPIN</span>
+        <span className="game-title" style={{ fontSize: '1.1rem' }}>🌀 血繼限界轉盤</span>
         <span className="text-gold">💰 {player.ryo} Ryo</span>
       </div>
 
       <div className="card">
-        <div className="card-title">Spin for Bloodline</div>
+        <div className="card-title">轉盤抽取血繼限界</div>
         <div className="text-small text-gray" style={{ marginBottom: '12px' }}>
           Cost: {SPIN_CONFIG.priceRyo} Ryo per spin
         </div>
 
         {/* Odds Display */}
         <div style={{ marginBottom: '12px' }}>
-          <div className="text-small text-gray" style={{ marginBottom: '4px' }}>Base Rates:</div>
+          <div className="text-small text-gray" style={{ marginBottom: '4px' }}>基礎機率：</div>
           {SPIN_CONFIG.entries.map(entry => {
             const bl = BLOODLINES[entry.bloodlineId];
             return (
@@ -51,7 +51,7 @@ export function SpinScreen() {
           })}
           {player.rankBonus.spinRarityBonus > 0 && (
             <div className="text-small text-gold" style={{ marginTop: '4px' }}>
-              Rank Bonus: +{player.rankBonus.spinRarityBonus * 100}% to RARE/LEGENDARY
+              等級加成：+{player.rankBonus.spinRarityBonus * 100}% RARE/LEGENDARY 機率
             </div>
           )}
         </div>
@@ -62,13 +62,13 @@ export function SpinScreen() {
           disabled={player.ryo < SPIN_CONFIG.priceRyo || isSpinning}
           onClick={handleSpin}
         >
-          {isSpinning ? '🌀 Spinning...' : '🌀 SPIN! (100 Ryo)'}
+          {isSpinning ? '🌀 轉動中...' : '🌀 抽取！(100 Ryo)'}
         </button>
 
         {state.notifications[0] && (
           <div className="spin-result">
-            <span className={state.notifications[0].includes('LEGENDARY') || state.notifications[0].includes('Void') ? 'text-purple text-bold' :
-              state.notifications[0].includes('RARE') || state.notifications[0].includes('Storm') ? 'text-blue text-bold' : ''}>
+            <span className={state.notifications[0].includes('宇智波') ? 'text-purple text-bold' :
+              state.notifications[0].includes('日向') || state.notifications[0].includes('霧隱') ? 'text-blue text-bold' : ''}>
               {state.notifications[0]}
             </span>
           </div>
@@ -77,9 +77,9 @@ export function SpinScreen() {
 
       {/* Owned Bloodlines */}
       <div className="card">
-        <div className="card-title">Your Bloodlines ({player.ownedBloodlines.length})</div>
+        <div className="card-title">你的血繼限界 ({player.ownedBloodlines.length})</div>
         {player.ownedBloodlines.length === 0 ? (
-          <div className="text-gray text-small">No bloodlines yet. Spin to get one!</div>
+          <div className="text-gray text-small">尚未獲得血繼限界。轉動抽取！</div>
         ) : (
           player.ownedBloodlines.map(owned => {
             const bl = BLOODLINES[owned.id];
@@ -101,7 +101,7 @@ export function SpinScreen() {
                   onClick={() => dispatch({ type: 'EQUIP_BLOODLINE', bloodlineId: owned.id })}
                   style={{ minWidth: '70px' }}
                 >
-                  {isEquipped ? '✓ On' : 'Equip'}
+                  {isEquipped ? '✓ 已裝備' : '裝備'}
                 </button>
               </div>
             );

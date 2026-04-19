@@ -59,7 +59,7 @@ export function CombatScreen() {
             </div>
             <div className="hp-bar-container" style={{ marginTop: '4px' }}>
               <div className="hp-bar-label">
-                <span className="text-blue text-small">MD</span>
+                <span className="text-blue text-small">Chakra</span>
                 <span className="text-small">{player.stats.md}/{player.stats.maxMd}</span>
               </div>
               <div className="hp-bar"><div className="hp-bar-fill md-fill" style={{ width: `${mdPct}%` }} /></div>
@@ -108,10 +108,10 @@ export function CombatScreen() {
               onClick={() => dispatch({ type: 'BATTLE_TOGGLE_MODE' })}
             >
               {player.isInMode
-                ? '⚡ Deactivate Mode'
+                ? '⚡ 關閉仙人模式'
                 : battle.modeCooldown > 0
-                  ? `⚡ Mode (CD: ${battle.modeCooldown}t)`
-                  : '⚡ Activate Mode'}
+                  ? `⚡ 仙人模式 (CD: ${battle.modeCooldown}t)`
+                  : '⚡ 啟動仙人模式'}
             </button>
             {availableSkills.map(skill => {
               const cd = battle.skillCooldowns.find(c => c.skillId === skill.id);
@@ -132,12 +132,12 @@ export function CombatScreen() {
                     ? ` (LV${skill.requiredLevel})`
                     : onCd
                       ? ` (${cd!.remainingTurns}t)`
-                      : ` (${skill.mdCost}MD${skill.hpCost > 0 ? `+${skill.hpCost}HP` : ''})`}
+                      : ` (${skill.mdCost}Chakra${skill.hpCost > 0 ? `+${skill.hpCost}HP` : ''})`}
                 </button>
               );
             })}
             <button className="btn btn-danger" onClick={() => dispatch({ type: 'BATTLE_RUN' })}>
-              🏃 Run
+              🏃 逃跑
             </button>
           </div>
         </div>
@@ -147,10 +147,10 @@ export function CombatScreen() {
       {isVictory && !isQuestComplete && (
         <div className="card">
           <div className="text-bold text-gold" style={{ marginBottom: '8px' }}>
-            ✓ Enemy Defeated! ({battle.enemiesDefeated + 1}/{quest.targetCount})
+            ✓ 敵人擊敗！({battle.enemiesDefeated + 1}/{quest.targetCount})
           </div>
           <button className="btn btn-primary" onClick={() => dispatch({ type: 'BATTLE_NEXT_ENEMY' })}>
-            Next Enemy →
+            下一個敵人 →
           </button>
         </div>
       )}
@@ -159,13 +159,13 @@ export function CombatScreen() {
       {isQuestComplete && (
         <div className="card">
           <div className="text-bold text-gold" style={{ marginBottom: '8px' }}>
-            🏆 Quest Complete!
+            🏆 任務完成！
           </div>
           <div className="text-small" style={{ marginBottom: '8px' }}>
-            Reward: +{quest.reward.exp} EXP, +{quest.reward.ryo} Ryo
+            獎勵：+{quest.reward.exp} EXP, +{quest.reward.ryo} Ryo
           </div>
           <button className="btn btn-success" onClick={() => dispatch({ type: 'COLLECT_QUEST_REWARD' })}>
-            Collect Reward
+            領取獎勵
           </button>
         </div>
       )}
@@ -173,10 +173,10 @@ export function CombatScreen() {
       {isDefeat && (
         <div className="card">
           <div className="text-bold text-red" style={{ marginBottom: '8px' }}>
-            💀 You were defeated...
+            💀 你被擊敗了…
           </div>
           <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'HUB' })}>
-            Return to HUB
+            返回據點
           </button>
         </div>
       )}

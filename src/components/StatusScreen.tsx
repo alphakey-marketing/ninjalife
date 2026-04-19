@@ -1,5 +1,5 @@
 import { useGame } from '../gameStore';
-import { BLOODLINES, EXP_PER_LEVEL, SKILLS } from '../constants';
+import { BLOODLINES, EXP_PER_LEVEL, RANK_DISPLAY, SKILLS } from '../constants';
 import { calcMdRegen, calcPlayerAtk, calcPlayerDef, calcPlayerMaxHp, calcPlayerSpd } from '../gameLogic';
 
 export function StatusScreen() {
@@ -20,7 +20,7 @@ export function StatusScreen() {
       <div className="header-bar">
         <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'HUB' })}>← Back</button>
         <span className="game-title" style={{ fontSize: '1.1rem' }}>📊 Status</span>
-        <span className={`rank-badge rank-${player.rank}`}>Rank {player.rank}</span>
+        <span className={`rank-badge rank-${player.rank}`}>{RANK_DISPLAY[player.rank]}</span>
       </div>
 
       {/* Core Stats */}
@@ -29,8 +29,8 @@ export function StatusScreen() {
         <div className="stat-row"><span className="stat-label">Level</span><span className="stat-value">{player.stats.level} / 30</span></div>
         <div className="stat-row"><span className="stat-label">EXP</span><span className="stat-value">{player.stats.exp} / {player.stats.level < 30 ? EXP_PER_LEVEL(player.stats.level) : 'MAX'}</span></div>
         <div className="stat-row"><span className="stat-label">HP</span><span className="stat-value">{player.stats.hp} / {effMaxHp}</span></div>
-        <div className="stat-row"><span className="stat-label">MD</span><span className="stat-value">{player.stats.md} / {player.stats.maxMd}</span></div>
-        <div className="stat-row"><span className="stat-label">MD Regen / turn</span><span className="stat-value-gold">+{mdRegen}</span></div>
+        <div className="stat-row"><span className="stat-label">Chakra</span><span className="stat-value">{player.stats.md} / {player.stats.maxMd}</span></div>
+        <div className="stat-row"><span className="stat-label">Chakra 回復/回合</span><span className="stat-value-gold">+{mdRegen}</span></div>
         <div className="stat-row"><span className="stat-label">ATK (base)</span><span className="stat-value">{player.stats.atk}</span></div>
         <div className="stat-row"><span className="stat-label">ATK (effective)</span><span className="stat-value-gold">{effAtk.toFixed(1)}</span></div>
         <div className="stat-row"><span className="stat-label">DEF (base)</span><span className="stat-value">{player.stats.def}</span></div>
@@ -64,7 +64,7 @@ export function StatusScreen() {
             </div>
             <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div className="text-bold">FOC (Focus) → +10 Max MD, +0.5 MD/turn</div>
+                <div className="text-bold">FOC (專注) → +10 最大 Chakra, +0.5 Chakra/回合</div>
                 <div className="text-small text-gray">Current: {player.statPoints.foc} allocated</div>
               </div>
               <button className="btn btn-primary" onClick={() => dispatch({ type: 'ALLOCATE_STAT', stat: 'foc' })}>
@@ -77,7 +77,7 @@ export function StatusScreen() {
 
       {/* Bloodline */}
       <div className="card">
-        <div className="card-title">🩸 Bloodline</div>
+        <div className="card-title">🩸 血繼限界 (Kekkei Genkai)</div>
         {equipped ? (
           <>
             <div className={`rarity-${equipped.rarity.toLowerCase()} text-bold`}>
@@ -101,7 +101,7 @@ export function StatusScreen() {
                 <span>SPD +{equipped.passive.spdBonus + Math.max(0, equippedMastery - 1)} </span>
               )}
               {equipped.passive.mdRegenBonus && (
-                <span>MDRegen +{equipped.passive.mdRegenBonus + Math.max(0, equippedMastery - 1)} </span>
+                <span>Chakra回復 +{equipped.passive.mdRegenBonus + Math.max(0, equippedMastery - 1)} </span>
               )}
               {equippedMastery > 1 && <span className="text-gold">(mastery {equippedMastery})</span>}
             </div>
@@ -125,12 +125,12 @@ export function StatusScreen() {
               </div>
               <div className="text-small text-gray">{skill.description}</div>
               <div className="flex-row text-small" style={{ marginTop: '4px' }}>
-                {skill.mdCost > 0 && <span className="text-blue">MD: {skill.mdCost}</span>}
+                {skill.mdCost > 0 && <span className="text-blue">Chakra: {skill.mdCost}</span>}
                 {skill.hpCost > 0 && <span className="text-red">HP: {skill.hpCost}</span>}
                 <span className="text-gray">CD: {skill.cooldownTurn}t</span>
                 {(skill.effects.damageMultiplier ?? 0) > 0 && <span className="text-gold">DMG: ×{skill.effects.damageMultiplier}</span>}
                 {skill.effects.healSelfPercent && <span className="text-green">Heal: {(skill.effects.healSelfPercent * 100).toFixed(0)}%HP</span>}
-                {skill.effects.mdRestore && <span className="text-blue">Restore: {skill.effects.mdRestore}MD</span>}
+                {skill.effects.mdRestore && <span className="text-blue">回復: {skill.effects.mdRestore}Chakra</span>}
                 {skill.effects.burnChance && <span className="text-red">Burn: {(skill.effects.burnChance * 100).toFixed(0)}%</span>}
               </div>
             </div>
@@ -140,8 +140,8 @@ export function StatusScreen() {
 
       {/* Rank Info */}
       <div className="card">
-        <div className="card-title">🏆 Rank</div>
-        <div className="stat-row"><span className="stat-label">Current Rank</span><span className={`rank-badge rank-${player.rank}`}>Rank {player.rank}</span></div>
+        <div className="card-title">🏆 忍者等級</div>
+        <div className="stat-row"><span className="stat-label">目前等級</span><span className={`rank-badge rank-${player.rank}`}>{RANK_DISPLAY[player.rank]}</span></div>
         <div className="stat-row"><span className="stat-label">ATK Multiplier</span><span className="stat-value-gold">×{player.rankBonus.baseAtkMultiplier}</span></div>
         <div className="stat-row"><span className="stat-label">Spin Rarity Bonus</span><span className="stat-value-gold">+{(player.rankBonus.spinRarityBonus * 100).toFixed(0)}%</span></div>
         {player.rank !== 'C' && (

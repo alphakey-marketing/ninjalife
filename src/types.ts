@@ -2,7 +2,7 @@ export type Rarity = 'COMMON' | 'RARE' | 'LEGENDARY';
 export type QuestType = 'GRIND' | 'ELITE' | 'BOSS';
 export type Rank = 'E' | 'D' | 'C';
 export type ActionType = 'ATTACK' | 'SKILL' | 'TOGGLE_MODE' | 'RUN';
-export type Screen = 'HUB' | 'QUEST' | 'COMBAT' | 'SPIN' | 'STATUS';
+export type Screen = 'HUB' | 'QUEST' | 'COMBAT' | 'SPIN' | 'STATUS' | 'CLINIC';
 
 export interface PlayerStats {
   level: number;
@@ -45,6 +45,7 @@ export interface PlayerState {
   currentQuestId: string | null;
   bossDefeatedThisRank: boolean;
   completedQuestIds: string[];
+  freeRestUsedToday: boolean;
 }
 
 export interface SkillEffectNumbers {

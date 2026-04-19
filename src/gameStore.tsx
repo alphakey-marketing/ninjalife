@@ -10,6 +10,7 @@ import {
   equipBloodline,
   performAttack,
   performRankUp,
+  performRest,
   performSkill,
   performSpin,
   toggleMode,
@@ -35,6 +36,8 @@ type GameAction =
   | { type: 'EQUIP_BLOODLINE'; bloodlineId: string }
   | { type: 'ALLOCATE_STAT'; stat: 'str' | 'vit' | 'foc' }
   | { type: 'RANK_UP' }
+  | { type: 'REST_FREE' }
+  | { type: 'REST_PAY' }
   | { type: 'SAVE_GAME' }
   | { type: 'LOAD_GAME' }
   | { type: 'DEQUEUE_NOTIFICATION' };
@@ -63,6 +66,7 @@ const initialPlayer: PlayerState = {
   currentQuestId: null,
   bossDefeatedThisRank: false,
   completedQuestIds: [],
+  freeRestUsedToday: false,
 };
 
 const initialState: GameState = {
@@ -163,19 +167,24 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'BATTLE_RUN': {
       const battlePlayer = state.battle ? state.battle.player : state.player;
-      // Restore full MD on retreat so the player isn't punished by resource drought next quest
+      // Use state.player as base to avoid snapshot staleness; carry over current battle HP
       const restoredPlayer: PlayerState = {
-        ...battlePlayer,
+        ...state.player,
         currentQuestId: null,
         isInMode: false,
-        stats: { ...battlePlayer.stats, md: battlePlayer.stats.maxMd },
+        stats: {
+          ...state.player.stats,
+          hp: battlePlayer.stats.hp,
+          // Restore full Chakra on retreat so the player isn't punished by resource drought
+          md: state.player.stats.maxMd,
+        },
       };
       return {
         ...state,
         screen: 'HUB',
         battle: null,
         player: restoredPlayer,
-        notifications: [...state.notifications, 'You fled the battle!'],
+        notifications: [...state.notifications, '逃跑成功！'],
       };
     }
 
@@ -183,7 +192,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (!state.battle || state.battle.phase !== 'VICTORY') return state;
       const quest = QUESTS.find(q => q.id === state.battle!.questId)!;
       const newDefeated = state.battle.enemiesDefeated + 1;
-      const updatedPlayer = { ...state.battle.player };
+      // Use state.player as base to avoid snapshot staleness; carry over current battle HP/MD/mode
+      const updatedPlayer: PlayerState = {
+        ...state.player,
+        stats: {
+          ...state.player.stats,
+          hp: state.battle.player.stats.hp,
+          md: state.battle.player.stats.md,
+        },
+        isInMode: state.battle.player.isInMode,
+      };
 
       if (newDefeated >= quest.targetCount) {
         return {
@@ -194,7 +212,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             player: updatedPlayer,
             enemiesDefeated: newDefeated,
             phase: 'QUEST_COMPLETE',
-            battleLog: [...state.battle.battleLog, 'Quest complete! Collect your reward.'],
+            battleLog: [...state.battle.battleLog, '任務完成！領取你的報酬吧。'],
           },
         };
       }
@@ -215,7 +233,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           },
           skillCooldowns: [],
           turnNumber: state.battle.turnNumber + 1,
-          battleLog: [...state.battle.battleLog, `A new ${enemyDef.name} appears!`],
+          battleLog: [...state.battle.battleLog, `新的 ${enemyDef.name} 出現！`],
           phase: 'PLAYER_TURN',
           enemiesDefeated: newDefeated,
         },
@@ -225,8 +243,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'COLLECT_QUEST_REWARD': {
       if (!state.battle) return state;
       const quest = QUESTS.find(q => q.id === state.battle!.questId)!;
-      const preRewardLevel = state.battle.player.stats.level;
-      let player = { ...state.battle.player };
+      // Use state.player as base to avoid snapshot staleness; carry over battle HP only
+      const preRewardLevel = state.player.stats.level;
+      let player = { ...state.player };
 
       // Mark quest as completed (first-time tracking)
       const completedQuestIds = player.completedQuestIds.includes(quest.id)
@@ -235,15 +254,19 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       player = {
         ...player,
-        stats: { ...player.stats, exp: player.stats.exp + quest.reward.exp },
+        stats: {
+          ...player.stats,
+          exp: player.stats.exp + quest.reward.exp,
+          // Carry over HP damage taken during battle; restore full Chakra on completion
+          hp: state.battle.player.stats.hp,
+          md: player.stats.maxMd,
+        },
         ryo: player.ryo + quest.reward.ryo,
         bossDefeatedThisRank: quest.type === 'BOSS' ? true : player.bossDefeatedThisRank,
         currentQuestId: null,
         isInMode: false,
-        // Restore full MD on quest complete
         completedQuestIds,
       };
-      player = { ...player, stats: { ...player.stats, md: player.stats.maxMd } };
 
       player = checkLevelUp(player);
 
@@ -252,12 +275,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         screen: 'HUB',
         battle: null,
         player,
-        notifications: [...state.notifications, `Quest Complete! +${quest.reward.exp} EXP +${quest.reward.ryo} Ryo`],
+        notifications: [...state.notifications, `任務完成！+${quest.reward.exp} EXP +${quest.reward.ryo} Ryo`],
       };
 
       // Level-up notifications for each level gained
       for (let lv = preRewardLevel + 1; lv <= player.stats.level; lv++) {
-        finalState = notify(finalState, `⬆ Level Up! Now Level ${lv}!`);
+        finalState = notify(finalState, `⬆ 升級！現在是 Level ${lv}！`);
       }
 
       // Auto-save after quest completion
@@ -278,7 +301,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const newPlayer = equipBloodline(state.player, action.bloodlineId);
       const unlockedMode = newPlayer.stats.level >= 10 && !!newPlayer.equippedBloodlineId;
       return {
-        ...notify(state, `Equipped ${action.bloodlineId} bloodline!`),
+        ...notify(state, `已裝備 ${action.bloodlineId} 血繼限界！`),
         player: { ...newPlayer, unlockedMode: unlockedMode || newPlayer.unlockedMode },
       };
     }
@@ -290,18 +313,30 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'RANK_UP': {
       if (!canRankUp(state.player)) {
-        return notify(state, 'Cannot rank up yet! Need LV30 and BOSS cleared.');
+        return notify(state, '尚未滿足晉升條件！需要 LV30 並擊敗 BOSS。');
       }
       const newPlayer = performRankUp(state.player);
-      return notify({ ...state, player: newPlayer }, `Ranked up to Rank ${newPlayer.rank}!`);
+      return notify({ ...state, player: newPlayer }, `恭喜晉升至 Rank ${newPlayer.rank}！`);
+    }
+
+    case 'REST_FREE': {
+      const { player: newPlayer, success, message } = performRest(state.player, 'FREE');
+      const newState = success ? { ...state, player: newPlayer } : state;
+      return notify(newState, message);
+    }
+
+    case 'REST_PAY': {
+      const { player: newPlayer, success, message } = performRest(state.player, 'PAY');
+      const newState = success ? { ...state, player: newPlayer } : state;
+      return notify(newState, message);
     }
 
     case 'SAVE_GAME': {
       try {
         localStorage.setItem('ninjalife_save', JSON.stringify({ saveVersion: SAVE_VERSION, player: state.player }));
-        return notify(state, 'Game saved!');
+        return notify(state, '遊戲已儲存！');
       } catch {
-        return notify(state, 'Failed to save!');
+        return notify(state, '儲存失敗！');
       }
     }
 
@@ -316,12 +351,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           const player: PlayerState = {
             ...rawPlayer,
             completedQuestIds: rawPlayer.completedQuestIds ?? [],
+            freeRestUsedToday: rawPlayer.freeRestUsedToday ?? false,
           };
-          return notify({ ...state, player, screen: 'HUB', battle: null }, 'Game loaded!');
+          return notify({ ...state, player, screen: 'HUB', battle: null }, '遊戲已讀取！');
         }
-        return notify(state, 'No save found!');
+        return notify(state, '找不到存檔！');
       } catch {
-        return notify(state, 'Failed to load!');
+        return notify(state, '讀取失敗！');
       }
     }
 

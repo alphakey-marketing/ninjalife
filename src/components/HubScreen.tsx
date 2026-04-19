@@ -1,6 +1,6 @@
 import { useGame } from '../gameStore';
 import { canRankUp, calcPlayerMaxHp } from '../gameLogic';
-import { BLOODLINES, EXP_PER_LEVEL } from '../constants';
+import { BLOODLINES, EXP_PER_LEVEL, RANK_DISPLAY } from '../constants';
 
 export function HubScreen() {
   const { state, dispatch } = useGame();
@@ -16,9 +16,9 @@ export function HubScreen() {
     <div className="screen">
       {/* Header */}
       <div className="header-bar">
-        <span className="game-title">⚔ Ninja Life</span>
+        <span className="game-title">🥷 Ninja Life</span>
         <div className="flex-row">
-          <span className={`rank-badge rank-${player.rank}`}>Rank {player.rank}</span>
+          <span className={`rank-badge rank-${player.rank}`}>{RANK_DISPLAY[player.rank]}</span>
           <span className="text-gold">💰 {player.ryo} Ryo</span>
         </div>
       </div>
@@ -38,7 +38,7 @@ export function HubScreen() {
           </div>
           <div className="hp-bar-container">
             <div className="hp-bar-label">
-              <span className="text-blue">MD</span>
+              <span className="text-blue">Chakra</span>
               <span>{player.stats.md} / {player.stats.maxMd}</span>
             </div>
             <div className="hp-bar">
@@ -76,37 +76,40 @@ export function HubScreen() {
 
       {/* Bloodline */}
       <div className="card">
-        <div className="card-title">🩸 Bloodline</div>
+        <div className="card-title">🩸 血繼限界 (Kekkei Genkai)</div>
         {equipped ? (
           <div className="flex-row">
             <span className={`rarity-${equipped.rarity.toLowerCase()}`}>◆ {equipped.name}</span>
             <span className="text-small text-gray">[{equipped.rarity}]</span>
-            {player.isInMode && <span className="mode-active">⚡ MODE ACTIVE</span>}
+            {player.isInMode && <span className="mode-active">⚡ 仙人模式</span>}
           </div>
         ) : (
-          <span className="text-gray">No bloodline equipped. Visit SPIN to get one!</span>
+          <span className="text-gray">尚未裝備血繼限界。前往 SPIN 取得！</span>
         )}
         {player.unlockedMode && !player.isInMode && (
-          <div className="text-small text-gray" style={{ marginTop: '4px' }}>Mode unlocked (activate in combat)</div>
+          <div className="text-small text-gray" style={{ marginTop: '4px' }}>仙人模式已解鎖（可在戰鬥中啟動）</div>
         )}
       </div>
 
       {/* Navigation */}
       <div className="card">
-        <div className="card-title">🗺 Navigation</div>
+        <div className="card-title">🗺 導航</div>
         <div className="nav-buttons">
           <button className="btn btn-primary" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'QUEST' })}>
-            ⚔ Quests
+            ⚔ 任務
           </button>
           <button className="btn btn-primary" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'SPIN' })}>
-            🌀 SPIN
+            🌀 血繼轉盤
           </button>
           <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'STATUS' })}>
-            📊 Status
+            📊 狀態
+          </button>
+          <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'CLINIC' })}>
+            🏥 診療所
           </button>
           {canRankUp(player) && (
             <button className="btn btn-success" onClick={() => dispatch({ type: 'RANK_UP' })}>
-              ⬆ Rank Up!
+              ⬆ 晉升！
             </button>
           )}
         </div>
@@ -114,8 +117,8 @@ export function HubScreen() {
 
       {/* Save/Load */}
       <div className="flex-row">
-        <button className="btn text-small" onClick={() => dispatch({ type: 'SAVE_GAME' })}>💾 Save</button>
-        <button className="btn text-small" onClick={() => dispatch({ type: 'LOAD_GAME' })}>📂 Load</button>
+        <button className="btn text-small" onClick={() => dispatch({ type: 'SAVE_GAME' })}>💾 儲存</button>
+        <button className="btn text-small" onClick={() => dispatch({ type: 'LOAD_GAME' })}>📂 讀取</button>
       </div>
     </div>
   );

@@ -35,6 +35,7 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     currentQuestId: null,
     bossDefeatedThisRank: false,
     completedQuestIds: [],
+    freeRestUsedToday: false,
     ...overrides,
   };
 }

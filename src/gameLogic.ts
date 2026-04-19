@@ -1,4 +1,4 @@
-import { BLOODLINES, EXP_PER_LEVEL, LEVEL_CAP, MD_REGEN_BASE, MODE_CONFIG, SKILLS, SPIN_CONFIG, STAT_POINTS_PER_LEVEL } from './constants';
+import { BLOODLINES, CLINIC_COSTS, EXP_PER_LEVEL, LEVEL_CAP, MD_REGEN_BASE, MODE_CONFIG, SKILLS, SPIN_CONFIG, STAT_POINTS_PER_LEVEL } from './constants';
 import type { BattleState, PlayerState, SkillDefinition } from './types';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -461,10 +461,10 @@ export function performSpin(player: PlayerState): { player: PlayerState; result:
     newOwnedBloodlines = newOwnedBloodlines.map(b =>
       b.id === chosenId ? { ...b, mastery: b.mastery + 1 } : b
     );
-    resultMsg = `Duplicate! ${BLOODLINES[chosenId].name} mastery +1`;
+    resultMsg = `重複！${BLOODLINES[chosenId].name} 熟練度 +1`;
   } else {
     newOwnedBloodlines.push({ id: chosenId, mastery: 1 });
-    resultMsg = `NEW BLOODLINE: ${BLOODLINES[chosenId].name}!`;
+    resultMsg = `新血繼限界：${BLOODLINES[chosenId].name}！`;
   }
 
   return {
@@ -540,5 +540,47 @@ export function equipBloodline(player: PlayerState, bloodlineId: string): Player
       ...newPlayer.stats,
       hp: Math.min(newPlayer.stats.hp, newEffectiveMaxHp),
     },
+  };
+}
+
+// ── Clinic rest ───────────────────────────────────────────────────────────────
+
+export function performRest(
+  player: PlayerState,
+  type: 'FREE' | 'PAY',
+): { player: PlayerState; success: boolean; message: string } {
+  const maxHp = calcPlayerMaxHp(player);
+
+  if (type === 'FREE') {
+    if (player.freeRestUsedToday) {
+      return { player, success: false, message: '今日已使用免費休息！明日再來。' };
+    }
+    const newHp = Math.min(maxHp, player.stats.hp + Math.floor(maxHp * 0.5));
+    const newMd = Math.min(player.stats.maxMd, player.stats.md + Math.floor(player.stats.maxMd * 0.5));
+    return {
+      player: {
+        ...player,
+        stats: { ...player.stats, hp: newHp, md: newMd },
+        freeRestUsedToday: true,
+      },
+      success: true,
+      message: '休息完成！HP 和 Chakra 各回復 50%。',
+    };
+  }
+
+  // PAY: full restore
+  const bracket = CLINIC_COSTS.find(b => player.stats.level <= b.maxLevel) ?? CLINIC_COSTS[CLINIC_COSTS.length - 1];
+  const cost = bracket.cost;
+  if (player.ryo < cost) {
+    return { player, success: false, message: `Ryo 不足！需要 ${cost} Ryo。` };
+  }
+  return {
+    player: {
+      ...player,
+      stats: { ...player.stats, hp: maxHp, md: player.stats.maxMd },
+      ryo: player.ryo - cost,
+    },
+    success: true,
+    message: `治療完成！HP 和 Chakra 全回復！（消耗 ${cost} Ryo）`,
   };
 }
