@@ -12,7 +12,8 @@ export function QuestScreen() {
   const { state, dispatch } = useGame();
   const { player } = state;
 
-  const rankQuests = QUESTS.filter(q => q.requiredRank === player.rank);
+  const rankOrder: Record<string, number> = { E: 0, D: 1, C: 2 };
+  const rankQuests = QUESTS.filter(q => rankOrder[q.requiredRank] <= rankOrder[player.rank]);
   const rankZones = QUEST_ZONES.filter(z =>
     z.questIds.some(id => rankQuests.find(q => q.id === id))
   );

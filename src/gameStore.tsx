@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import type { BattleState, PlayerState, Screen } from './types';
-import { ENEMIES, ITEMS, QUESTS, SAVE_VERSION, MAX_STAMINA } from './constants';
+import { ENEMIES, GEAR, ITEMS, QUESTS, SAVE_VERSION, MAX_STAMINA, STAMINA_RECOVERY_INTERVAL_MS, STAMINA_RECOVERY_AMOUNT } from './constants';
 import {
   applyItemEffect,
   applyStatPoint,
@@ -9,6 +9,7 @@ import {
   checkLevelUp,
   enemyHasFirstStrike,
   equipBloodline,
+  equipGear,
   getTodayString,
   isQuestAvailableForPlayer,
   performAttack,
@@ -18,6 +19,7 @@ import {
   performSpin,
   performUseItemInBattle,
   toggleMode,
+  unequipGear,
 } from './gameLogic';
 
 interface GameState {
@@ -45,6 +47,10 @@ type GameAction =
   | { type: 'BUY_ITEM'; itemId: string }
   | { type: 'USE_ITEM'; itemId: string }
   | { type: 'BATTLE_USE_ITEM'; itemId: string }
+  | { type: 'EQUIP_GEAR'; gearId: string }
+  | { type: 'UNEQUIP_GEAR'; slot: 'WEAPON' | 'ARMOR' | 'ACCESSORY' }
+  | { type: 'BUY_GEAR'; gearId: string }
+  | { type: 'STAMINA_TICK' }
   | { type: 'SAVE_GAME' }
   | { type: 'LOAD_GAME' }
   | { type: 'DEQUEUE_NOTIFICATION' }
@@ -80,6 +86,9 @@ const initialPlayer: PlayerState = {
   questResetTimestamps: {},
   stamina: MAX_STAMINA,
   maxStamina: MAX_STAMINA,
+  lastStaminaRecovery: Date.now(),
+  ownedGearIds: [],
+  equippedGear: { weapon: null, armor: null, accessory: null },
 };
 
 const initialState: GameState = {
@@ -155,7 +164,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'START_QUEST': {
       const quest = QUESTS.find(q => q.id === action.questId);
       if (!quest) return state;
-      if (quest.requiredRank !== state.player.rank) {
+      const rankOrder: Record<string, number> = { E: 0, D: 1, C: 2 };
+      if (rankOrder[quest.requiredRank] > rankOrder[state.player.rank]) {
         return notify(state, 'Rank 不符！');
       }
       if (!isQuestAvailableForPlayer(quest, state.player)) {
@@ -285,10 +295,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         if (!completedQuestIds.includes(quest.id)) {
           completedQuestIds = [...completedQuestIds, quest.id];
         }
-      } else {
-        // DAILY: record timestamp
+      } else if (quest.repeatType === 'DAILY') {
         questResetTimestamps = { ...questResetTimestamps, [quest.id]: Date.now() };
       }
+      // UNLIMITED: don't record anything
 
       player = {
         ...player,
@@ -396,6 +406,49 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       return { ...state, battle: newBattle };
     }
 
+    case 'EQUIP_GEAR': {
+      const newPlayer = equipGear(state.player, action.gearId);
+      return { ...state, player: newPlayer };
+    }
+
+    case 'UNEQUIP_GEAR': {
+      const newPlayer = unequipGear(state.player, action.slot);
+      return { ...state, player: newPlayer };
+    }
+
+    case 'BUY_GEAR': {
+      const gear = GEAR[action.gearId];
+      if (!gear) return notify(state, '未知裝備！');
+      if (state.player.ryo < gear.price) return notify(state, `Ryo 不足！需要 ${gear.price} Ryo。`);
+      if (state.player.ownedGearIds?.includes(action.gearId)) return notify(state, '已擁有此裝備！');
+      return notify(
+        {
+          ...state,
+          player: {
+            ...state.player,
+            ryo: state.player.ryo - gear.price,
+            ownedGearIds: [...(state.player.ownedGearIds ?? []), action.gearId],
+          },
+        },
+        `已購買 ${gear.name}！`,
+      );
+    }
+
+    case 'STAMINA_TICK': {
+      if (state.player.stamina >= state.player.maxStamina) return state;
+      const now = Date.now();
+      const last = state.player.lastStaminaRecovery ?? now;
+      const intervals = Math.floor((now - last) / STAMINA_RECOVERY_INTERVAL_MS);
+      if (intervals <= 0) return state;
+      const gain = intervals * STAMINA_RECOVERY_AMOUNT;
+      const newStamina = Math.min(state.player.maxStamina, state.player.stamina + gain);
+      const newLast = last + intervals * STAMINA_RECOVERY_INTERVAL_MS;
+      return {
+        ...state,
+        player: { ...state.player, stamina: newStamina, lastStaminaRecovery: newLast },
+      };
+    }
+
     case 'SAVE_GAME': {
       try {
         localStorage.setItem('ninjalife_save', JSON.stringify({ saveVersion: SAVE_VERSION, player: state.player }));
@@ -425,6 +478,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             questResetTimestamps: rawPlayer.questResetTimestamps ?? {},
             stamina: rawPlayer.stamina ?? MAX_STAMINA,
             maxStamina: rawPlayer.maxStamina ?? MAX_STAMINA,
+            lastStaminaRecovery: rawPlayer.lastStaminaRecovery ?? Date.now(),
+            ownedGearIds: rawPlayer.ownedGearIds ?? [],
+            equippedGear: rawPlayer.equippedGear ?? { weapon: null, armor: null, accessory: null },
           };
           void freeRestUsedToday; // only used via _deprecated above
           return notify({ ...state, player, screen: 'HUB', battle: null }, '遊戲已讀取！');
@@ -461,6 +517,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       return () => clearTimeout(timer);
     }
   }, [state.notifications]);
+
+  // Stamina real-time recovery: check every 30s
+  useEffect(() => {
+    const interval = setInterval(() => dispatch({ type: 'STAMINA_TICK' }), 30_000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <GameContext.Provider value={{ state, dispatch }}>

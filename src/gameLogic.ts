@@ -1,4 +1,4 @@
-import { BLOODLINES, CLINIC_COSTS, EXP_PER_LEVEL, getLevelCapForRank, ITEMS, MAX_STAMINA, MD_REGEN_BASE, MODE_CONFIG, RARE_BLOODLINE_IDS, SKILLS, SPIN_CONFIG, STAMINA_REST_FREE, STAT_POINTS_PER_LEVEL } from './constants';
+import { BLOODLINES, CLINIC_COSTS, EXP_PER_LEVEL, GEAR, getLevelCapForRank, ITEMS, MAX_STAMINA, MD_REGEN_BASE, MODE_CONFIG, RARE_BLOODLINE_IDS, SKILLS, SPIN_CONFIG, STAT_POINTS_PER_LEVEL } from './constants';
 import type { ActiveBuff, BattleState, InventoryItem, PlayerState, QuestDefinition, SkillDefinition } from './types';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -10,6 +10,9 @@ export function getTodayString(): string {
 export function isQuestAvailableForPlayer(quest: QuestDefinition, player: PlayerState): boolean {
   if (quest.repeatType === 'ONCE') {
     return !player.completedQuestIds.includes(quest.id);
+  }
+  if (quest.repeatType === 'UNLIMITED') {
+    return true; // only stamina-limited
   }
   // DAILY
   const ts = player.questResetTimestamps?.[quest.id];
@@ -23,6 +26,25 @@ function getEquippedMastery(player: PlayerState): number {
   return player.ownedBloodlines.find(b => b.id === player.equippedBloodlineId)?.mastery ?? 0;
 }
 
+function getEquippedGearStats(player: PlayerState) {
+  const eg = player.equippedGear;
+  if (!eg) return { atkBonus: 0, defBonus: 0, hpBonus: 0, spdBonus: 0, mdRegenBonus: 0, hpRegenPerTurn: 0 };
+  const slots: (string | null)[] = [eg.weapon, eg.armor, eg.accessory];
+  let atkBonus = 0, defBonus = 0, hpBonus = 0, spdBonus = 0, mdRegenBonus = 0, hpRegenPerTurn = 0;
+  for (const id of slots) {
+    if (!id) continue;
+    const g = GEAR[id];
+    if (!g) continue;
+    atkBonus += g.stats.atkBonus ?? 0;
+    defBonus += g.stats.defBonus ?? 0;
+    hpBonus += g.stats.hpBonus ?? 0;
+    spdBonus += g.stats.spdBonus ?? 0;
+    mdRegenBonus += g.stats.mdRegenBonus ?? 0;
+    hpRegenPerTurn += g.stats.hpRegenPerTurn ?? 0;
+  }
+  return { atkBonus, defBonus, hpBonus, spdBonus, mdRegenBonus, hpRegenPerTurn };
+}
+
 /** Each mastery level above 1 grants +2% to the base passive multiplier / bonus. */
 function masteryOffset(mastery: number): number {
   return Math.max(0, mastery - 1) * 0.02;
@@ -31,7 +53,8 @@ function masteryOffset(mastery: number): number {
 // ── Player stat calculators ───────────────────────────────────────────────────
 
 export function calcPlayerAtk(player: PlayerState): number {
-  let atk = player.stats.atk;
+  const gearStats = getEquippedGearStats(player);
+  let atk = player.stats.atk + gearStats.atkBonus;
   const bloodline = player.equippedBloodlineId ? BLOODLINES[player.equippedBloodlineId] : null;
   if (bloodline?.passive.atkMultiplier) {
     const mastery = getEquippedMastery(player);
@@ -48,7 +71,8 @@ export function calcPlayerAtk(player: PlayerState): number {
 }
 
 export function calcPlayerDef(player: PlayerState): number {
-  let def = player.stats.def;
+  const gearStats = getEquippedGearStats(player);
+  let def = player.stats.def + gearStats.defBonus;
   const bloodline = player.equippedBloodlineId ? BLOODLINES[player.equippedBloodlineId] : null;
   if (bloodline?.passive.defMultiplier) {
     const mastery = getEquippedMastery(player);
@@ -64,7 +88,8 @@ export function calcPlayerDef(player: PlayerState): number {
 }
 
 export function calcPlayerMaxHp(player: PlayerState): number {
-  let maxHp = player.stats.maxHp;
+  const gearStats = getEquippedGearStats(player);
+  let maxHp = player.stats.maxHp + gearStats.hpBonus;
   const bloodline = player.equippedBloodlineId ? BLOODLINES[player.equippedBloodlineId] : null;
   if (bloodline?.passive.hpMultiplier) {
     maxHp *= bloodline.passive.hpMultiplier;
@@ -73,7 +98,8 @@ export function calcPlayerMaxHp(player: PlayerState): number {
 }
 
 export function calcPlayerSpd(player: PlayerState): number {
-  let spd = player.stats.spd;
+  const gearStats = getEquippedGearStats(player);
+  let spd = player.stats.spd + gearStats.spdBonus;
   const bloodline = player.equippedBloodlineId ? BLOODLINES[player.equippedBloodlineId] : null;
   if (bloodline?.passive.spdBonus) {
     const mastery = getEquippedMastery(player);
@@ -87,12 +113,13 @@ export function calcPlayerSpd(player: PlayerState): number {
 }
 
 export function calcMdRegen(player: PlayerState): number {
+  const gearStats = getEquippedGearStats(player);
   const mastery = getEquippedMastery(player);
   const bloodline = player.equippedBloodlineId ? BLOODLINES[player.equippedBloodlineId] : null;
   const bloodlineBonus = bloodline?.passive.mdRegenBonus ?? 0;
   // Mastery scales regen for bloodlines that have mdRegenBonus
   const masteryScaling = bloodlineBonus > 0 ? Math.max(0, mastery - 1) : 0;
-  return MD_REGEN_BASE + Math.floor(player.statPoints.foc / 2) + bloodlineBonus + masteryScaling;
+  return MD_REGEN_BASE + Math.floor(player.statPoints.foc / 2) + bloodlineBonus + masteryScaling + gearStats.mdRegenBonus;
 }
 
 export function calcDamage(atk: number, enemyDef: number): number {
@@ -324,6 +351,16 @@ function advanceToEnemyTurn(state: BattleState): BattleState {
       s = { ...s, battleLog: [...s.battleLog, 'Mode deactivated! Out of MD.'], modeCooldown: 5 };
     } else {
       newPlayer = { ...newPlayer, stats: { ...newPlayer.stats, md: newMd } };
+    }
+  }
+
+  // Apply gear HP regen per turn
+  const gearStats = getEquippedGearStats(newPlayer);
+  if (gearStats.hpRegenPerTurn > 0) {
+    const effectiveMaxHp = calcPlayerMaxHp(newPlayer);
+    const regenHp = Math.min(effectiveMaxHp, newPlayer.stats.hp + gearStats.hpRegenPerTurn);
+    if (regenHp > newPlayer.stats.hp) {
+      newPlayer = { ...newPlayer, stats: { ...newPlayer.stats, hp: regenHp } };
     }
   }
 
@@ -631,16 +668,14 @@ export function performRest(
     }
     const newHp = Math.min(maxHp, player.stats.hp + Math.floor(maxHp * 0.5));
     const newMd = Math.min(player.stats.maxMd, player.stats.md + Math.floor(player.stats.maxMd * 0.5));
-    const newStamina = Math.min(player.maxStamina, player.stamina + STAMINA_REST_FREE);
     return {
       player: {
         ...player,
         stats: { ...player.stats, hp: newHp, md: newMd },
-        stamina: newStamina,
         lastFreeRestDate: getTodayString(),
       },
       success: true,
-      message: `休息完成！HP 和 Chakra 各回復 50%，精力回復 ${STAMINA_REST_FREE}。`,
+      message: '休息完成！HP 和 Chakra 各回復 50%。精力請使用精力丹回復。',
     };
   }
 
@@ -655,10 +690,9 @@ export function performRest(
       ...player,
       stats: { ...player.stats, hp: maxHp, md: player.stats.maxMd },
       ryo: player.ryo - cost,
-      stamina: player.maxStamina,
     },
     success: true,
-    message: `治療完成！HP 和 Chakra 全回復！精力全回復！（消耗 ${cost} Ryo）`,
+    message: `治療完成！HP 和 Chakra 全回復！（消耗 ${cost} Ryo）`,
   };
 }
 
@@ -788,5 +822,46 @@ export function applyItemEffect(
     player: { ...player, stats: newStats, stamina: newStamina, inventory: newInventory },
     message: msg,
     success: true,
+  };
+}
+
+// ── Gear ──────────────────────────────────────────────────────────────────────
+
+export function equipGear(player: PlayerState, gearId: string): PlayerState {
+  const gear = GEAR[gearId];
+  if (!gear) return player;
+  if (!player.ownedGearIds?.includes(gearId)) return player;
+
+  const newEquippedGear = {
+    ...(player.equippedGear ?? { weapon: null, armor: null, accessory: null }),
+    [gear.slot.toLowerCase()]: gearId,
+  };
+  const newPlayer = { ...player, equippedGear: newEquippedGear };
+
+  // Clamp HP to new effective max
+  const newEffectiveMaxHp = calcPlayerMaxHp(newPlayer);
+  return {
+    ...newPlayer,
+    stats: {
+      ...newPlayer.stats,
+      hp: Math.min(newPlayer.stats.hp, newEffectiveMaxHp),
+    },
+  };
+}
+
+export function unequipGear(player: PlayerState, slot: 'WEAPON' | 'ARMOR' | 'ACCESSORY'): PlayerState {
+  const slotKey = slot.toLowerCase() as 'weapon' | 'armor' | 'accessory';
+  const newEquippedGear = {
+    ...(player.equippedGear ?? { weapon: null, armor: null, accessory: null }),
+    [slotKey]: null,
+  };
+  const newPlayer = { ...player, equippedGear: newEquippedGear };
+  const newEffectiveMaxHp = calcPlayerMaxHp(newPlayer);
+  return {
+    ...newPlayer,
+    stats: {
+      ...newPlayer.stats,
+      hp: Math.min(newPlayer.stats.hp, newEffectiveMaxHp),
+    },
   };
 }

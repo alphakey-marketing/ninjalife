@@ -1,13 +1,16 @@
-import type { BloodlineDefinition, EnemyDefinition, ItemDefinition, ModeConfig, QuestDefinition, RankDefinition, Rank, SkillDefinition, SpinConfig } from './types';
+import type { BloodlineDefinition, EnemyDefinition, GearDefinition, ItemDefinition, ModeConfig, QuestDefinition, RankDefinition, Rank, SkillDefinition, SpinConfig } from './types';
 
 // Save version history:
 // 1 → 2: Added completedQuestIds, freeRestUsedToday
 // 2 → 3: Added inventory, activeBuffs, questResetTimestamps; migrated freeRestUsedToday → lastFreeRestDate (YYYY-MM-DD)
 // 3 → 4: Added stamina/maxStamina, staminaCost on quests, playerStatusEffects in battle
-export const SAVE_VERSION = 4;
+// 4 → 5: Added gear system (ownedGearIds, equippedGear), lastStaminaRecovery
+export const SAVE_VERSION = 5;
 export const MD_REGEN_BASE = 5;
 export const MAX_STAMINA = 100;
 export const STAMINA_REST_FREE = 50;
+export const STAMINA_RECOVERY_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+export const STAMINA_RECOVERY_AMOUNT = 5; // +5 per interval
 
 /** Display names for ranks (Naruto theme) */
 export const RANK_DISPLAY: Record<Rank, string> = {
@@ -413,7 +416,7 @@ export const QUESTS: QuestDefinition[] = [
     targetEnemyId: 'TRAINING_DUMMY',
     targetCount: 5,
     reward: { exp: 50, ryo: 80 },
-    repeatType: 'DAILY',
+    repeatType: 'UNLIMITED',
     staminaCost: 5,
   },
   {
@@ -426,7 +429,7 @@ export const QUESTS: QuestDefinition[] = [
     targetEnemyId: 'FOREST_WOLF',
     targetCount: 3,
     reward: { exp: 100, ryo: 100 },
-    repeatType: 'DAILY',
+    repeatType: 'UNLIMITED',
     staminaCost: 5,
   },
   {
@@ -439,7 +442,7 @@ export const QUESTS: QuestDefinition[] = [
     targetEnemyId: 'BANDIT_CHIEF',
     targetCount: 2,
     reward: { exp: 170, ryo: 145 },
-    repeatType: 'DAILY',
+    repeatType: 'UNLIMITED',
     staminaCost: 8,
   },
   {
@@ -452,7 +455,7 @@ export const QUESTS: QuestDefinition[] = [
     targetEnemyId: 'ELITE_NINJA',
     targetCount: 1,
     reward: { exp: 260, ryo: 200 },
-    repeatType: 'DAILY',
+    repeatType: 'UNLIMITED',
     staminaCost: 8,
   },
   {
@@ -465,7 +468,7 @@ export const QUESTS: QuestDefinition[] = [
     targetEnemyId: 'MOUNTAIN_BEAR',
     targetCount: 3,
     reward: { exp: 360, ryo: 270 },
-    repeatType: 'DAILY',
+    repeatType: 'UNLIMITED',
     staminaCost: 8,
   },
   {
@@ -478,7 +481,7 @@ export const QUESTS: QuestDefinition[] = [
     targetEnemyId: 'ELITE_NINJA',
     targetCount: 2,
     reward: { exp: 420, ryo: 290 },
-    repeatType: 'DAILY',
+    repeatType: 'UNLIMITED',
     staminaCost: 10,
   },
   {
@@ -491,7 +494,7 @@ export const QUESTS: QuestDefinition[] = [
     targetEnemyId: 'TEMPLE_MONK',
     targetCount: 2,
     reward: { exp: 460, ryo: 330 },
-    repeatType: 'DAILY',
+    repeatType: 'UNLIMITED',
     staminaCost: 10,
   },
   {
@@ -504,7 +507,7 @@ export const QUESTS: QuestDefinition[] = [
     targetEnemyId: 'ELITE_NINJA',
     targetCount: 3,
     reward: { exp: 560, ryo: 390 },
-    repeatType: 'DAILY',
+    repeatType: 'UNLIMITED',
     staminaCost: 12,
   },
   {
@@ -531,7 +534,7 @@ export const QUESTS: QuestDefinition[] = [
     targetEnemyId: 'JONIN_VETERAN',
     targetCount: 5,
     reward: { exp: 800, ryo: 500 },
-    repeatType: 'DAILY',
+    repeatType: 'UNLIMITED',
     staminaCost: 8,
   },
   {
@@ -544,7 +547,7 @@ export const QUESTS: QuestDefinition[] = [
     targetEnemyId: 'SAND_PUPPETEER',
     targetCount: 2,
     reward: { exp: 1200, ryo: 750 },
-    repeatType: 'DAILY',
+    repeatType: 'UNLIMITED',
     staminaCost: 10,
   },
   {
@@ -557,7 +560,7 @@ export const QUESTS: QuestDefinition[] = [
     targetEnemyId: 'ROGUE_SHINOBI',
     targetCount: 2,
     reward: { exp: 1500, ryo: 900 },
-    repeatType: 'DAILY',
+    repeatType: 'UNLIMITED',
     staminaCost: 12,
   },
   {
@@ -584,7 +587,7 @@ export const QUESTS: QuestDefinition[] = [
     targetEnemyId: 'ANBU_CAPTAIN',
     targetCount: 5,
     reward: { exp: 2000, ryo: 1000 },
-    repeatType: 'DAILY',
+    repeatType: 'UNLIMITED',
     staminaCost: 12,
   },
   {
@@ -597,7 +600,7 @@ export const QUESTS: QuestDefinition[] = [
     targetEnemyId: 'LEGENDARY_NINJA',
     targetCount: 2,
     reward: { exp: 2800, ryo: 1400 },
-    repeatType: 'DAILY',
+    repeatType: 'UNLIMITED',
     staminaCost: 15,
   },
   {
@@ -610,7 +613,7 @@ export const QUESTS: QuestDefinition[] = [
     targetEnemyId: 'CURSED_SEAL_USER',
     targetCount: 2,
     reward: { exp: 3200, ryo: 1600 },
-    repeatType: 'DAILY',
+    repeatType: 'UNLIMITED',
     staminaCost: 18,
   },
   {
@@ -685,4 +688,94 @@ export const QUEST_ZONES: { zone: string; emoji: string; questIds: string[] }[] 
   { zone: '最終試煉', emoji: '🌀', questIds: ['BOSS_QUEST'] },
   { zone: '中忍領域', emoji: '🏯', questIds: ['D_PATROL_QUEST', 'D_PUPPET_QUEST', 'D_ROGUE_QUEST', 'D_BOSS_QUEST'] },
   { zone: '上忍領域', emoji: '⚔️', questIds: ['C_ANBU_QUEST', 'C_LEGEND_QUEST', 'C_CURSED_QUEST', 'C_BOSS_QUEST'] },
+];
+
+export const GEAR: Record<string, GearDefinition> = {
+  STARTER_SWORD: {
+    id: 'STARTER_SWORD',
+    name: '木葉標準刀',
+    description: '木葉村下忍標準裝備，基礎攻擊力提升。',
+    slot: 'WEAPON',
+    rarity: 'COMMON',
+    price: 200,
+    stats: { atkBonus: 5 },
+  },
+  WIND_BLADE: {
+    id: 'WIND_BLADE',
+    name: '追風刃',
+    description: '以風遁查克拉強化的刀刃，攻擊力大幅提升。',
+    slot: 'WEAPON',
+    rarity: 'RARE',
+    price: 600,
+    stats: { atkBonus: 14 },
+  },
+  THUNDER_FANG: {
+    id: 'THUNDER_FANG',
+    name: '雷牙',
+    description: '以雷遁凝聚的傳說兵器，攻擊力極強。',
+    slot: 'WEAPON',
+    rarity: 'LEGENDARY',
+    price: 2000,
+    stats: { atkBonus: 28 },
+  },
+  TRAINING_ROBE: {
+    id: 'TRAINING_ROBE',
+    name: '訓練道服',
+    description: '標準忍者道服，提供基本防禦。',
+    slot: 'ARMOR',
+    rarity: 'COMMON',
+    price: 200,
+    stats: { defBonus: 5 },
+  },
+  ANBU_ARMOR: {
+    id: 'ANBU_ARMOR',
+    name: '暗部護甲',
+    description: '木葉暗部的精鍛護甲，攻守兼備。',
+    slot: 'ARMOR',
+    rarity: 'RARE',
+    price: 800,
+    stats: { defBonus: 12, hpBonus: 30 },
+  },
+  SAGE_COAT: {
+    id: 'SAGE_COAT',
+    name: '仙人外套',
+    description: '傳說仙人的戰甲，每回合自動回復少量HP。',
+    slot: 'ARMOR',
+    rarity: 'LEGENDARY',
+    price: 2500,
+    stats: { defBonus: 20, hpBonus: 60, hpRegenPerTurn: 3 },
+  },
+  CHAKRA_BEAD: {
+    id: 'CHAKRA_BEAD',
+    name: '查克拉珠',
+    description: '查克拉充沛的念珠，戰鬥中加快查克拉回復。',
+    slot: 'ACCESSORY',
+    rarity: 'COMMON',
+    price: 300,
+    stats: { mdRegenBonus: 8 },
+  },
+  SPEED_SEAL: {
+    id: 'SPEED_SEAL',
+    name: '速度封印',
+    description: '印刻在皮膚上的速度封印，大幅提升移動速度。',
+    slot: 'ACCESSORY',
+    rarity: 'RARE',
+    price: 700,
+    stats: { spdBonus: 4 },
+  },
+  LIFE_CHARM: {
+    id: 'LIFE_CHARM',
+    name: '生命護符',
+    description: '充滿生命力的護符，每回合被動回復 HP。',
+    slot: 'ACCESSORY',
+    rarity: 'LEGENDARY',
+    price: 1800,
+    stats: { hpRegenPerTurn: 5, hpBonus: 40 },
+  },
+};
+
+export const GEAR_SHOP_IDS: string[] = [
+  'STARTER_SWORD', 'WIND_BLADE', 'THUNDER_FANG',
+  'TRAINING_ROBE', 'ANBU_ARMOR', 'SAGE_COAT',
+  'CHAKRA_BEAD', 'SPEED_SEAL', 'LIFE_CHARM',
 ];

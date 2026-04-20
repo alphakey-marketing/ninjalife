@@ -37,6 +37,9 @@ export function SpinScreen() {
 
       <div className="card">
         <div className="card-title">轉盤抽取血繼限界</div>
+        <div className="text-small text-gray" style={{ marginBottom: '8px' }}>
+          重複抽到已有血繼限界可提升熟練度，每級熟練度提供 +2% 被動技能加成。
+        </div>
         <div className="text-small text-gray" style={{ marginBottom: '12px' }}>
           Cost: {SPIN_CONFIG.priceRyo} Ryo per spin
         </div>
@@ -101,7 +104,10 @@ export function SpinScreen() {
                   </div>
                   <div className="text-small text-gray" style={{ marginTop: '2px' }}>{bl.description}</div>
                   <div className="text-small" style={{ marginTop: '2px' }}>
-                    Mastery: <span className="text-gold">{owned.mastery}</span>
+                    熟練度: <span className="text-gold">{owned.mastery}</span>
+                    {owned.mastery > 1 && (
+                      <span className="text-gray"> (+{((owned.mastery - 1) * 2)}% 被動加成)</span>
+                    )}
                   </div>
                 </div>
                 <button

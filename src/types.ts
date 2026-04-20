@@ -2,8 +2,10 @@ export type Rarity = 'COMMON' | 'RARE' | 'LEGENDARY';
 export type QuestType = 'GRIND' | 'ELITE' | 'BOSS';
 export type Rank = 'E' | 'D' | 'C';
 export type ActionType = 'ATTACK' | 'SKILL' | 'TOGGLE_MODE' | 'RUN';
-export type Screen = 'HUB' | 'QUEST' | 'COMBAT' | 'SPIN' | 'STATUS' | 'CLINIC' | 'SHOP' | 'INTRO';
-export type QuestRepeatType = 'DAILY' | 'ONCE';
+export type Screen = 'HUB' | 'QUEST' | 'COMBAT' | 'SPIN' | 'STATUS' | 'CLINIC' | 'SHOP' | 'GEAR' | 'INTRO';
+export type QuestRepeatType = 'UNLIMITED' | 'DAILY' | 'ONCE';
+export type GearSlot = 'WEAPON' | 'ARMOR' | 'ACCESSORY';
+export type GearRarity = 'COMMON' | 'RARE' | 'LEGENDARY';
 export type ItemType = 'POTION' | 'CHAKRA_PILL' | 'SCROLL';
 
 export interface ItemEffect {
@@ -56,6 +58,31 @@ export interface OwnedBloodline {
   mastery: number;
 }
 
+export interface GearStats {
+  atkBonus?: number;
+  defBonus?: number;
+  hpBonus?: number;
+  spdBonus?: number;
+  mdRegenBonus?: number;
+  hpRegenPerTurn?: number;
+}
+
+export interface GearDefinition {
+  id: string;
+  name: string;
+  description: string;
+  slot: GearSlot;
+  rarity: GearRarity;
+  price: number;
+  stats: GearStats;
+}
+
+export interface EquippedGear {
+  weapon: string | null;
+  armor: string | null;
+  accessory: string | null;
+}
+
 export interface PlayerState {
   name: string;
   rank: Rank;
@@ -79,6 +106,9 @@ export interface PlayerState {
   questResetTimestamps: Record<string, number>;
   stamina: number;
   maxStamina: number;
+  lastStaminaRecovery: number;
+  ownedGearIds: string[];
+  equippedGear: EquippedGear;
 }
 
 export interface SkillEffectNumbers {

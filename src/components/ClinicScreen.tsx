@@ -1,5 +1,5 @@
 import { useGame } from '../gameStore';
-import { CLINIC_COSTS } from '../constants';
+import { CLINIC_COSTS, STAMINA_RECOVERY_INTERVAL_MS, STAMINA_RECOVERY_AMOUNT } from '../constants';
 import { calcPlayerMaxHp, getTodayString } from '../gameLogic';
 
 export function ClinicScreen() {
@@ -13,6 +13,15 @@ export function ClinicScreen() {
   const payBracket = CLINIC_COSTS.find(b => player.stats.level <= b.maxLevel) ?? CLINIC_COSTS[CLINIC_COSTS.length - 1];
   const payCost = payBracket.cost;
   const freeRestUsedToday = player.lastFreeRestDate === getTodayString();
+
+  const now = Date.now();
+  const nextRecovery = (player.lastStaminaRecovery ?? now) + STAMINA_RECOVERY_INTERVAL_MS;
+  const secsUntil = Math.max(0, Math.ceil((nextRecovery - now) / 1000));
+  const minsUntil = Math.floor(secsUntil / 60);
+  const secsLeft = secsUntil % 60;
+  const recoveryLabel = player.stamina >= player.maxStamina
+    ? '精力已滿'
+    : `${minsUntil}:${String(secsLeft).padStart(2, '0')} 後 +${STAMINA_RECOVERY_AMOUNT}`;
 
   return (
     <div className="screen">
@@ -46,7 +55,7 @@ export function ClinicScreen() {
         <div className="hp-bar-container" style={{ marginTop: '8px' }}>
           <div className="hp-bar-label">
             <span className="text-orange">精力</span>
-            <span>{player.stamina} / {player.maxStamina}</span>
+            <span>{player.stamina} / {player.maxStamina} <span className="text-small text-gray">({recoveryLabel})</span></span>
           </div>
           <div className="hp-bar">
             <div className="hp-bar-fill stamina-fill" style={{ width: `${staminaPct}%` }} />
@@ -58,7 +67,7 @@ export function ClinicScreen() {
       <div className="card">
         <div className="card-title">😴 免費休息（每日一次）</div>
         <div className="text-small text-gray" style={{ marginBottom: '12px' }}>
-          回復 50% HP + 50% Chakra + 50 精力。每日限使用一次。
+          回復 50% HP + 50% Chakra。每日限使用一次。（精力請使用精力丹）
         </div>
         {freeRestUsedToday ? (
           <div className="text-small text-red" style={{ marginBottom: '8px' }}>
@@ -75,7 +84,7 @@ export function ClinicScreen() {
           disabled={freeRestUsedToday}
           onClick={() => dispatch({ type: 'REST_FREE' })}
         >
-          😴 免費休息（+50% HP / Chakra / +50 精力）
+          😴 免費休息（+50% HP / Chakra）
         </button>
       </div>
 
@@ -83,7 +92,7 @@ export function ClinicScreen() {
       <div className="card">
         <div className="card-title">💊 醫療忍者治療（全回復）</div>
         <div className="text-small text-gray" style={{ marginBottom: '8px' }}>
-          消耗 Ryo 全回復 HP、Chakra 和精力。
+          消耗 Ryo 全回復 HP 和 Chakra。（精力不在此回復）
         </div>
         <div className="text-small" style={{ marginBottom: '12px' }}>
           {CLINIC_COSTS.map((b, i) => {

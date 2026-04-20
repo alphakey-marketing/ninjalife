@@ -19,7 +19,7 @@ import {
   performRankUp,
   performRest,
 } from '../gameLogic';
-import type { BattleState, PlayerState } from '../types';
+import type { BattleState, PlayerState, QuestDefinition } from '../types';
 import { CLINIC_COSTS, EXP_PER_LEVEL, MD_REGEN_BASE, QUESTS } from '../constants';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -45,6 +45,9 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     questResetTimestamps: {},
     stamina: 100,
     maxStamina: 100,
+    lastStaminaRecovery: Date.now(),
+    ownedGearIds: [],
+    equippedGear: { weapon: null, armor: null, accessory: null },
     ...overrides,
   };
 }
@@ -493,7 +496,20 @@ describe('New quests (phase 1.3)', () => {
 
 describe('isQuestAvailableForPlayer', () => {
   const onceQuest = QUESTS.find(q => q.repeatType === 'ONCE')!;
-  const dailyQuest = QUESTS.find(q => q.repeatType === 'DAILY')!;
+  // Create a synthetic DAILY quest for DAILY-specific tests
+  const dailyQuest: QuestDefinition = {
+    id: 'TEST_DAILY',
+    name: 'Test Daily',
+    description: 'Test',
+    type: 'GRIND',
+    requiredLevel: 1,
+    requiredRank: 'E',
+    targetEnemyId: 'TRAINING_DUMMY',
+    targetCount: 1,
+    reward: { exp: 10, ryo: 10 },
+    repeatType: 'DAILY',
+    staminaCost: 5,
+  };
 
   it('ONCE quest is available when not completed', () => {
     const player = makePlayer();
@@ -610,27 +626,25 @@ describe('getTodayString', () => {
 
 // ── Stamina (Phase 1.4) ───────────────────────────────────────────────────────
 
-import { STAMINA_REST_FREE } from '../constants';
-
-describe('performRest FREE restores stamina', () => {
-  it('restores stamina by STAMINA_REST_FREE', () => {
+describe('performRest FREE does NOT restore stamina', () => {
+  it('does not change stamina on free rest', () => {
     const player = makePlayer({ stamina: 20, maxStamina: 100 });
     const { player: result, success } = performRest(player, 'FREE');
     expect(success).toBe(true);
-    expect(result.stamina).toBe(20 + STAMINA_REST_FREE);
+    expect(result.stamina).toBe(20); // unchanged
   });
 
-  it('stamina is capped at maxStamina', () => {
+  it('stamina remains unchanged on free rest when at max', () => {
     const player = makePlayer({ stamina: 90, maxStamina: 100 });
     const { player: result } = performRest(player, 'FREE');
-    expect(result.stamina).toBeLessThanOrEqual(100);
+    expect(result.stamina).toBe(90); // unchanged
   });
 
-  it('PAY rest fully restores stamina', () => {
+  it('PAY rest does NOT restore stamina', () => {
     const player = makePlayer({ ryo: 200, stamina: 10, maxStamina: 100 });
     const { player: result, success } = performRest(player, 'PAY');
     expect(success).toBe(true);
-    expect(result.stamina).toBe(100);
+    expect(result.stamina).toBe(10); // unchanged
   });
 });
 
@@ -671,5 +685,56 @@ describe('ATK_DOWN status effect reduces damage', () => {
     const debuffedDmg = 50 - resultDebuffed.enemy.currentHp;
 
     expect(debuffedDmg).toBeLessThan(normalDmg);
+  });
+});
+
+// ── Gear system (Phase 2.0) ───────────────────────────────────────────────────
+
+describe('gear system', () => {
+  it('calcPlayerAtk includes weapon bonus', () => {
+    const player = makePlayer({
+      ownedGearIds: ['STARTER_SWORD'],
+      equippedGear: { weapon: 'STARTER_SWORD', armor: null, accessory: null },
+    });
+    expect(calcPlayerAtk(player)).toBe(15); // (10 + 5) * 1.0 rank bonus
+  });
+
+  it('calcPlayerDef includes armor bonus', () => {
+    const player = makePlayer({
+      ownedGearIds: ['TRAINING_ROBE'],
+      equippedGear: { weapon: null, armor: 'TRAINING_ROBE', accessory: null },
+    });
+    expect(calcPlayerDef(player)).toBe(10); // 5 + 5 armor
+  });
+
+  it('calcPlayerMaxHp includes armor hpBonus', () => {
+    const player = makePlayer({
+      ownedGearIds: ['ANBU_ARMOR'],
+      equippedGear: { weapon: null, armor: 'ANBU_ARMOR', accessory: null },
+    });
+    expect(calcPlayerMaxHp(player)).toBe(130); // 100 + 30
+  });
+
+  it('no gear gives no bonus', () => {
+    const player = makePlayer();
+    expect(calcPlayerAtk(player)).toBe(10);
+    expect(calcPlayerDef(player)).toBe(5);
+    expect(calcPlayerMaxHp(player)).toBe(100);
+  });
+});
+
+// ── isQuestAvailableForPlayer – UNLIMITED ─────────────────────────────────────
+
+describe('isQuestAvailableForPlayer - UNLIMITED', () => {
+  it('UNLIMITED quest is always available', () => {
+    const player = makePlayer({ questResetTimestamps: { 'GRIND_QUEST': Date.now() } });
+    const quest = QUESTS.find(q => q.id === 'GRIND_QUEST')!;
+    expect(isQuestAvailableForPlayer(quest, player)).toBe(true);
+  });
+
+  it('UNLIMITED quest is available even after being done many times', () => {
+    const player = makePlayer({ completedQuestIds: ['GRIND_QUEST', 'GRIND_QUEST'] });
+    const quest = QUESTS.find(q => q.id === 'GRIND_QUEST')!;
+    expect(isQuestAvailableForPlayer(quest, player)).toBe(true);
   });
 });
