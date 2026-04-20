@@ -6,6 +6,7 @@ import { SpinScreen } from './components/SpinScreen';
 import { StatusScreen } from './components/StatusScreen';
 import { ClinicScreen } from './components/ClinicScreen';
 import { ShopScreen } from './components/ShopScreen';
+import { IntroScreen } from './components/IntroScreen';
 import './App.css';
 
 function GameContent() {
@@ -17,6 +18,7 @@ function GameContent() {
       {currentNotification && (
         <div className="notification">{currentNotification}</div>
       )}
+      {state.screen === 'INTRO' && <IntroScreen />}
       {state.screen === 'HUB' && <HubScreen />}
       {state.screen === 'QUEST' && <QuestScreen />}
       {state.screen === 'COMBAT' && <CombatScreen />}

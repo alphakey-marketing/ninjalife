@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import type { BattleState, PlayerState, Screen } from './types';
-import { ENEMIES, ITEMS, QUESTS, SAVE_VERSION } from './constants';
+import { ENEMIES, ITEMS, QUESTS, SAVE_VERSION, MAX_STAMINA } from './constants';
 import {
   applyItemEffect,
   applyStatPoint,
@@ -47,7 +47,8 @@ type GameAction =
   | { type: 'BATTLE_USE_ITEM'; itemId: string }
   | { type: 'SAVE_GAME' }
   | { type: 'LOAD_GAME' }
-  | { type: 'DEQUEUE_NOTIFICATION' };
+  | { type: 'DEQUEUE_NOTIFICATION' }
+  | { type: 'SET_PLAYER_NAME'; name: string };
 
 const initialPlayer: PlayerState = {
   name: 'Ninja',
@@ -77,10 +78,12 @@ const initialPlayer: PlayerState = {
   inventory: [],
   activeBuffs: [],
   questResetTimestamps: {},
+  stamina: MAX_STAMINA,
+  maxStamina: MAX_STAMINA,
 };
 
 const initialState: GameState = {
-  screen: 'HUB',
+  screen: 'INTRO',
   player: initialPlayer,
   battle: null,
   notifications: [],
@@ -116,6 +119,12 @@ function createBattle(player: PlayerState, questId: string): BattleState {
     battleLog.push(`⚠ ${enemyDef.name} may charge up powerful attacks!`);
   } else if (enemyDef.specialAbility === 'GUARD') {
     battleLog.push(`⚠ ${enemyDef.name} may guard against your strikes!`);
+  } else if (enemyDef.specialAbility === 'HEAL') {
+    battleLog.push(`⚠ ${enemyDef.name} may heal when low on HP!`);
+  } else if (enemyDef.specialAbility === 'MULTI_HIT') {
+    battleLog.push(`⚠ ${enemyDef.name} may strike multiple times!`);
+  } else if (enemyDef.specialAbility === 'DEBUFF') {
+    battleLog.push(`⚠ ${enemyDef.name} may debuff your attack!`);
   }
 
   return {
@@ -134,6 +143,7 @@ function createBattle(player: PlayerState, questId: string): BattleState {
     enemiesDefeated: 0,
     questId,
     modeCooldown: 0,
+    playerStatusEffects: [],
   };
 }
 
@@ -154,12 +164,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (state.player.stats.level < quest.requiredLevel) {
         return notify(state, `Requires Level ${quest.requiredLevel}!`);
       }
-      const battle = createBattle(state.player, action.questId);
+      if (state.player.stamina < quest.staminaCost) {
+        return notify(state, `精力不足！需要 ${quest.staminaCost} 精力（現有 ${state.player.stamina}）`);
+      }
+      const playerWithStamina = { ...state.player, stamina: state.player.stamina - quest.staminaCost };
+      const battle = createBattle(playerWithStamina, action.questId);
       return {
         ...state,
         screen: 'COMBAT',
         battle,
-        player: { ...state.player, currentQuestId: action.questId },
+        player: { ...playerWithStamina, currentQuestId: action.questId },
       };
     }
 
@@ -252,6 +266,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           battleLog: [...state.battle.battleLog, `新的 ${enemyDef.name} 出現！`],
           phase: 'PLAYER_TURN',
           enemiesDefeated: newDefeated,
+          playerStatusEffects: state.battle.playerStatusEffects ?? [],
         },
       };
     }
@@ -408,6 +423,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             inventory: rawPlayer.inventory ?? [],
             activeBuffs: rawPlayer.activeBuffs ?? [],
             questResetTimestamps: rawPlayer.questResetTimestamps ?? {},
+            stamina: rawPlayer.stamina ?? MAX_STAMINA,
+            maxStamina: rawPlayer.maxStamina ?? MAX_STAMINA,
           };
           void freeRestUsedToday; // only used via _deprecated above
           return notify({ ...state, player, screen: 'HUB', battle: null }, '遊戲已讀取！');
@@ -420,6 +437,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'DEQUEUE_NOTIFICATION':
       return { ...state, notifications: state.notifications.slice(1) };
+
+    case 'SET_PLAYER_NAME':
+      return { ...state, player: { ...state.player, name: action.name }, screen: 'HUB' };
 
     default:
       return state;

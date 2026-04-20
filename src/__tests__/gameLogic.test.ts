@@ -43,6 +43,8 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     inventory: [],
     activeBuffs: [],
     questResetTimestamps: {},
+    stamina: 100,
+    maxStamina: 100,
     ...overrides,
   };
 }
@@ -69,6 +71,7 @@ function makeBattle(playerOverrides: Partial<PlayerState> = {}): BattleState {
     enemiesDefeated: 0,
     questId: 'GRIND_QUEST',
     modeCooldown: 0,
+    playerStatusEffects: [],
   };
 }
 
@@ -602,5 +605,71 @@ describe('calcPlayerAtk with activeBuffs', () => {
 describe('getTodayString', () => {
   it('returns a YYYY-MM-DD formatted string', () => {
     expect(getTodayString()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+// ── Stamina (Phase 1.4) ───────────────────────────────────────────────────────
+
+import { STAMINA_REST_FREE } from '../constants';
+
+describe('performRest FREE restores stamina', () => {
+  it('restores stamina by STAMINA_REST_FREE', () => {
+    const player = makePlayer({ stamina: 20, maxStamina: 100 });
+    const { player: result, success } = performRest(player, 'FREE');
+    expect(success).toBe(true);
+    expect(result.stamina).toBe(20 + STAMINA_REST_FREE);
+  });
+
+  it('stamina is capped at maxStamina', () => {
+    const player = makePlayer({ stamina: 90, maxStamina: 100 });
+    const { player: result } = performRest(player, 'FREE');
+    expect(result.stamina).toBeLessThanOrEqual(100);
+  });
+
+  it('PAY rest fully restores stamina', () => {
+    const player = makePlayer({ ryo: 200, stamina: 10, maxStamina: 100 });
+    const { player: result, success } = performRest(player, 'PAY');
+    expect(success).toBe(true);
+    expect(result.stamina).toBe(100);
+  });
+});
+
+describe('applyItemEffect with STAMINA_PILL', () => {
+  it('restores stamina', () => {
+    const player = makePlayer({
+      stamina: 50,
+      maxStamina: 100,
+      inventory: [{ itemId: 'STAMINA_PILL', quantity: 1 }],
+    });
+    const { player: result, success } = applyItemEffect(player, 'STAMINA_PILL');
+    expect(success).toBe(true);
+    expect(result.stamina).toBe(80); // 50 + 30
+  });
+
+  it('stamina from STAMINA_PILL is capped at maxStamina', () => {
+    const player = makePlayer({
+      stamina: 90,
+      maxStamina: 100,
+      inventory: [{ itemId: 'STAMINA_PILL', quantity: 1 }],
+    });
+    const { player: result } = applyItemEffect(player, 'STAMINA_PILL');
+    expect(result.stamina).toBe(100);
+  });
+});
+
+describe('ATK_DOWN status effect reduces damage', () => {
+  it('reduces player attack damage by atkDebuffPercent', () => {
+    const battleNormal = makeBattle();
+    const resultNormal = performAttack(battleNormal);
+    const normalDmg = 50 - resultNormal.enemy.currentHp;
+
+    const battleDebuffed = {
+      ...makeBattle(),
+      playerStatusEffects: [{ type: 'ATK_DOWN' as const, remainingTurns: 2, atkDebuffPercent: 0.20 }],
+    };
+    const resultDebuffed = performAttack(battleDebuffed);
+    const debuffedDmg = 50 - resultDebuffed.enemy.currentHp;
+
+    expect(debuffedDmg).toBeLessThan(normalDmg);
   });
 });

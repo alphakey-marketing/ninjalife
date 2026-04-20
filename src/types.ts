@@ -2,7 +2,7 @@ export type Rarity = 'COMMON' | 'RARE' | 'LEGENDARY';
 export type QuestType = 'GRIND' | 'ELITE' | 'BOSS';
 export type Rank = 'E' | 'D' | 'C';
 export type ActionType = 'ATTACK' | 'SKILL' | 'TOGGLE_MODE' | 'RUN';
-export type Screen = 'HUB' | 'QUEST' | 'COMBAT' | 'SPIN' | 'STATUS' | 'CLINIC' | 'SHOP';
+export type Screen = 'HUB' | 'QUEST' | 'COMBAT' | 'SPIN' | 'STATUS' | 'CLINIC' | 'SHOP' | 'INTRO';
 export type QuestRepeatType = 'DAILY' | 'ONCE';
 export type ItemType = 'POTION' | 'CHAKRA_PILL' | 'SCROLL';
 
@@ -11,6 +11,7 @@ export interface ItemEffect {
   hpRestorePercent?: number;
   mdRestore?: number;
   mdRestorePercent?: number;
+  staminaRestore?: number;
   atkMultiplier?: number;
   defMultiplier?: number;
   spdBonus?: number;
@@ -76,6 +77,8 @@ export interface PlayerState {
   inventory: InventoryItem[];
   activeBuffs: ActiveBuff[];
   questResetTimestamps: Record<string, number>;
+  stamina: number;
+  maxStamina: number;
 }
 
 export interface SkillEffectNumbers {
@@ -152,6 +155,7 @@ export interface QuestDefinition {
   targetCount: number;
   reward: QuestReward;
   repeatType: QuestRepeatType;
+  staminaCost: number;
 }
 
 export interface EnemyStats {
@@ -166,7 +170,7 @@ export interface EnemyDefinition {
   name: string;
   description: string;
   stats: EnemyStats;
-  specialAbility?: 'GUARD' | 'CHARGE';
+  specialAbility?: 'GUARD' | 'CHARGE' | 'HEAL' | 'MULTI_HIT' | 'DEBUFF';
   specialAbilityChance?: number;
 }
 
@@ -187,9 +191,10 @@ export interface SkillCooldownState {
 }
 
 export interface StatusEffect {
-  type: 'BURN';
-  damagePerTurn: number;
+  type: 'BURN' | 'ATK_DOWN';
+  damagePerTurn?: number;
   remainingTurns: number;
+  atkDebuffPercent?: number;
 }
 
 export interface BattleState {
@@ -208,4 +213,5 @@ export interface BattleState {
   enemiesDefeated: number;
   questId: string;
   modeCooldown: number;
+  playerStatusEffects: StatusEffect[];
 }

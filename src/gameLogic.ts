@@ -1,4 +1,4 @@
-import { BLOODLINES, CLINIC_COSTS, EXP_PER_LEVEL, getLevelCapForRank, ITEMS, MD_REGEN_BASE, MODE_CONFIG, RARE_BLOODLINE_IDS, SKILLS, SPIN_CONFIG, STAT_POINTS_PER_LEVEL } from './constants';
+import { BLOODLINES, CLINIC_COSTS, EXP_PER_LEVEL, getLevelCapForRank, ITEMS, MAX_STAMINA, MD_REGEN_BASE, MODE_CONFIG, RARE_BLOODLINE_IDS, SKILLS, SPIN_CONFIG, STAMINA_REST_FREE, STAT_POINTS_PER_LEVEL } from './constants';
 import type { ActiveBuff, BattleState, InventoryItem, PlayerState, QuestDefinition, SkillDefinition } from './types';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -124,9 +124,11 @@ export function performAttack(state: BattleState): BattleState {
   if (state.phase !== 'PLAYER_TURN') return state;
 
   const atk = calcPlayerAtk(state.player);
+  const atkDownEffect = (state.playerStatusEffects ?? []).find(e => e.type === 'ATK_DOWN');
+  const effectiveAtk = atkDownEffect ? atk * (1 - (atkDownEffect.atkDebuffPercent ?? 0)) : atk;
   const critChance = hasCritBonus(state.player);
   const isCrit = Math.random() < critChance;
-  let damage = calcDamage(atk, state.enemy.definition.stats.def);
+  let damage = calcDamage(effectiveAtk, state.enemy.definition.stats.def);
   if (isCrit) damage = Math.floor(damage * 1.5);
 
   // Enemy guard halves incoming damage
@@ -185,6 +187,8 @@ export function performSkill(state: BattleState, skillId: string): BattleState {
   }
 
   const atk = calcPlayerAtk(state.player);
+  const atkDownEffect = (state.playerStatusEffects ?? []).find(e => e.type === 'ATK_DOWN');
+  const effectiveAtk = atkDownEffect ? atk * (1 - (atkDownEffect.atkDebuffPercent ?? 0)) : atk;
   const damageMultiplier = skill.effects.damageMultiplier ?? 1.0;
 
   // Deduct costs first
@@ -201,7 +205,7 @@ export function performSkill(state: BattleState, skillId: string): BattleState {
 
   // Deal damage (damageMultiplier > 0 means an offensive skill)
   if (damageMultiplier > 0) {
-    let damage = Math.max(1, Math.floor(calcDamage(atk, state.enemy.definition.stats.def) * damageMultiplier));
+    let damage = Math.max(1, Math.floor(calcDamage(effectiveAtk, state.enemy.definition.stats.def) * damageMultiplier));
     // Enemy guard halves incoming damage
     if (state.enemy.isGuarding) {
       damage = Math.floor(damage * 0.5);
@@ -305,6 +309,12 @@ function advanceToEnemyTurn(state: BattleState): BattleState {
     .filter((b: ActiveBuff) => b.remainingTurns > 0);
   s = { ...s, player: { ...s.player, activeBuffs: updatedBuffs } };
 
+  // Decrement player status effects and remove expired ones
+  const updatedPlayerStatusEffects = (s.playerStatusEffects ?? [])
+    .map(e => ({ ...e, remainingTurns: e.remainingTurns - 1 }))
+    .filter(e => e.remainingTurns > 0);
+  s = { ...s, playerStatusEffects: updatedPlayerStatusEffects };
+
   // Process mode MD drain
   let newPlayer = { ...s.player };
   if (newPlayer.isInMode) {
@@ -326,48 +336,77 @@ export function performEnemyTurn(state: BattleState): BattleState {
   const newLog = [...state.battleLog];
   let newPlayer = { ...state.player };
   let newEnemy = { ...state.enemy };
+  let newPlayerStatusEffects = [...(state.playerStatusEffects ?? [])];
 
   // Process burn on enemy
   const burnEffect = newEnemy.statusEffects.find(e => e.type === 'BURN');
   if (burnEffect) {
+    const burnDmg = burnEffect.damagePerTurn ?? 0;
     newEnemy = {
       ...newEnemy,
-      currentHp: Math.max(0, newEnemy.currentHp - burnEffect.damagePerTurn),
+      currentHp: Math.max(0, newEnemy.currentHp - burnDmg),
       statusEffects: newEnemy.statusEffects
         .map(e => e.type === 'BURN' ? { ...e, remainingTurns: e.remainingTurns - 1 } : e)
         .filter(e => e.remainingTurns > 0),
     };
-    newLog.push(`Enemy burns for ${burnEffect.damagePerTurn} damage!`);
+    newLog.push(`Enemy burns for ${burnDmg} damage!`);
     if (newEnemy.currentHp <= 0) {
-      return { ...state, enemy: newEnemy, battleLog: newLog, phase: 'VICTORY' };
+      return { ...state, enemy: newEnemy, battleLog: newLog, phase: 'VICTORY', playerStatusEffects: newPlayerStatusEffects };
     }
   }
 
-  // Enemy special ability check
+  // Enemy special ability / attack logic
   const enemyDef = newEnemy.definition;
   let nextIsGuarding = false;
   let nextChargeReady = false;
 
   if (newEnemy.chargeReady) {
-    // Stored charge – deal 2× damage
     const def = calcPlayerDef(newPlayer);
     const damage = calcEnemyDamage(enemyDef.stats.atk * 2, def);
     const newHp = Math.max(0, newPlayer.stats.hp - damage);
     newLog.push(`⚡ ${enemyDef.name} unleashes a CHARGED attack for ${damage} damage!`);
     newPlayer = { ...newPlayer, stats: { ...newPlayer.stats, hp: newHp } };
-  } else if (enemyDef.specialAbility && Math.random() < (enemyDef.specialAbilityChance ?? 0)) {
-    if (enemyDef.specialAbility === 'GUARD') {
-      // Guard this turn – also reduces incoming damage (handled in performAttack/performSkill)
-      nextIsGuarding = true;
-      newLog.push(`🛡 ${enemyDef.name} braces for impact! (Guard active)`);
-      // Guard skips the normal attack
-    } else if (enemyDef.specialAbility === 'CHARGE') {
-      // Charge up – skip normal attack this turn, deal 2× next turn
-      nextChargeReady = true;
-      newLog.push(`⚡ ${enemyDef.name} is charging up a powerful attack!`);
+  } else if (enemyDef.specialAbility === 'GUARD' && Math.random() < (enemyDef.specialAbilityChance ?? 0)) {
+    nextIsGuarding = true;
+    newLog.push(`🛡 ${enemyDef.name} braces for impact! (Guard active)`);
+  } else if (enemyDef.specialAbility === 'CHARGE' && Math.random() < (enemyDef.specialAbilityChance ?? 0)) {
+    nextChargeReady = true;
+    newLog.push(`⚡ ${enemyDef.name} is charging up a powerful attack!`);
+  } else if (enemyDef.specialAbility === 'HEAL') {
+    if (newEnemy.currentHp < enemyDef.stats.maxHp * 0.4 && Math.random() < (enemyDef.specialAbilityChance ?? 0)) {
+      const healAmt = Math.floor(enemyDef.stats.maxHp * 0.2);
+      newEnemy = { ...newEnemy, currentHp: Math.min(enemyDef.stats.maxHp, newEnemy.currentHp + healAmt) };
+      newLog.push(`💚 ${enemyDef.name} 自我恢復了 ${healAmt} HP！`);
     }
+    // Always also attack this turn
+    const def = calcPlayerDef(newPlayer);
+    const damage = calcEnemyDamage(enemyDef.stats.atk, def);
+    const newHp = Math.max(0, newPlayer.stats.hp - damage);
+    newLog.push(`${enemyDef.name} attacks you for ${damage} damage.`);
+    newPlayer = { ...newPlayer, stats: { ...newPlayer.stats, hp: newHp } };
+  } else if (enemyDef.specialAbility === 'MULTI_HIT' && Math.random() < (enemyDef.specialAbilityChance ?? 0)) {
+    const def = calcPlayerDef(newPlayer);
+    let totalDmg = 0;
+    let currentHp = newPlayer.stats.hp;
+    for (let i = 0; i < 2; i++) {
+      const dmg = Math.max(1, Math.floor(calcEnemyDamage(enemyDef.stats.atk, def) * 0.6));
+      totalDmg += dmg;
+      currentHp = Math.max(0, currentHp - dmg);
+    }
+    newLog.push(`⚡ ${enemyDef.name} 連續攻擊 2 次，共造成 ${totalDmg} 點傷害！`);
+    newPlayer = { ...newPlayer, stats: { ...newPlayer.stats, hp: currentHp } };
+  } else if (enemyDef.specialAbility === 'DEBUFF' && Math.random() < (enemyDef.specialAbilityChance ?? 0)) {
+    const existing = newPlayerStatusEffects.find(e => e.type === 'ATK_DOWN');
+    if (!existing) {
+      newPlayerStatusEffects = [...newPlayerStatusEffects, { type: 'ATK_DOWN', remainingTurns: 2, atkDebuffPercent: 0.20 }];
+    }
+    const def = calcPlayerDef(newPlayer);
+    const damage = calcEnemyDamage(enemyDef.stats.atk, def);
+    const newHp = Math.max(0, newPlayer.stats.hp - damage);
+    newLog.push(`💜 ${enemyDef.name} 施展封印術！你的攻擊力下降 20%！（2 回合）`);
+    newLog.push(`${enemyDef.name} attacks you for ${damage} damage.`);
+    newPlayer = { ...newPlayer, stats: { ...newPlayer.stats, hp: newHp } };
   } else {
-    // Normal attack
     const def = calcPlayerDef(newPlayer);
     const damage = calcEnemyDamage(enemyDef.stats.atk, def);
     const newHp = Math.max(0, newPlayer.stats.hp - damage);
@@ -397,6 +436,7 @@ export function performEnemyTurn(state: BattleState): BattleState {
       enemy: { ...newEnemy, isGuarding: nextIsGuarding, chargeReady: nextChargeReady },
       battleLog: newLog,
       skillCooldowns: newCooldowns,
+      playerStatusEffects: newPlayerStatusEffects,
       phase: 'DEFEAT',
       turnNumber: state.turnNumber + 1,
     };
@@ -408,6 +448,7 @@ export function performEnemyTurn(state: BattleState): BattleState {
     enemy: { ...newEnemy, isGuarding: nextIsGuarding, chargeReady: nextChargeReady },
     battleLog: newLog,
     skillCooldowns: newCooldowns,
+    playerStatusEffects: newPlayerStatusEffects,
     phase: 'PLAYER_TURN',
     turnNumber: state.turnNumber + 1,
   };
@@ -546,6 +587,8 @@ export function performRankUp(player: PlayerState): PlayerState {
     bossDefeatedThisRank: false,
     currentQuestId: null,
     activeBuffs: [],
+    stamina: MAX_STAMINA,
+    maxStamina: MAX_STAMINA,
   };
 
   // Clamp starting HP to the effective max (e.g. Void reduces max HP).
@@ -588,14 +631,16 @@ export function performRest(
     }
     const newHp = Math.min(maxHp, player.stats.hp + Math.floor(maxHp * 0.5));
     const newMd = Math.min(player.stats.maxMd, player.stats.md + Math.floor(player.stats.maxMd * 0.5));
+    const newStamina = Math.min(player.maxStamina, player.stamina + STAMINA_REST_FREE);
     return {
       player: {
         ...player,
         stats: { ...player.stats, hp: newHp, md: newMd },
+        stamina: newStamina,
         lastFreeRestDate: getTodayString(),
       },
       success: true,
-      message: '休息完成！HP 和 Chakra 各回復 50%。',
+      message: `休息完成！HP 和 Chakra 各回復 50%，精力回復 ${STAMINA_REST_FREE}。`,
     };
   }
 
@@ -610,9 +655,10 @@ export function performRest(
       ...player,
       stats: { ...player.stats, hp: maxHp, md: player.stats.maxMd },
       ryo: player.ryo - cost,
+      stamina: player.maxStamina,
     },
     success: true,
-    message: `治療完成！HP 和 Chakra 全回復！（消耗 ${cost} Ryo）`,
+    message: `治療完成！HP 和 Chakra 全回復！精力全回復！（消耗 ${cost} Ryo）`,
   };
 }
 
@@ -705,6 +751,7 @@ export function applyItemEffect(
   }
 
   let newStats = { ...player.stats };
+  let newStamina = player.stamina;
   let msg = `你使用了 ${item.name}！`;
 
   const maxHp = calcPlayerMaxHp(player);
@@ -729,11 +776,16 @@ export function applyItemEffect(
     newStats = { ...newStats, md: Math.min(newStats.maxMd, newStats.md + restore) };
     msg += ` 回復 ${restore} Chakra。`;
   }
+  if (item.effect.staminaRestore) {
+    const restore = item.effect.staminaRestore;
+    newStamina = Math.min(player.maxStamina, newStamina + restore);
+    msg += ` 回復 ${restore} 精力。`;
+  }
 
   const newInventory = deductInventoryItem(player.inventory ?? [], itemId);
 
   return {
-    player: { ...player, stats: newStats, inventory: newInventory },
+    player: { ...player, stats: newStats, stamina: newStamina, inventory: newInventory },
     message: msg,
     success: true,
   };

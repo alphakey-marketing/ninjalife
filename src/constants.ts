@@ -3,8 +3,11 @@ import type { BloodlineDefinition, EnemyDefinition, ItemDefinition, ModeConfig, 
 // Save version history:
 // 1 → 2: Added completedQuestIds, freeRestUsedToday
 // 2 → 3: Added inventory, activeBuffs, questResetTimestamps; migrated freeRestUsedToday → lastFreeRestDate (YYYY-MM-DD)
-export const SAVE_VERSION = 3;
+// 3 → 4: Added stamina/maxStamina, staminaCost on quests, playerStatusEffects in battle
+export const SAVE_VERSION = 4;
 export const MD_REGEN_BASE = 5;
+export const MAX_STAMINA = 100;
+export const STAMINA_REST_FREE = 50;
 
 /** Display names for ranks (Naruto theme) */
 export const RANK_DISPLAY: Record<Rank, string> = {
@@ -296,6 +299,8 @@ export const ENEMIES: Record<string, EnemyDefinition> = {
     name: '追蹤忍犬',
     description: '木葉村的追蹤忍犬，速度迅猛。',
     stats: { maxHp: 70, atk: 9, def: 3, spd: 6 },
+    specialAbility: 'MULTI_HIT',
+    specialAbilityChance: 0.30,
   },
   BANDIT_CHIEF: {
     id: 'BANDIT_CHIEF',
@@ -310,6 +315,8 @@ export const ENEMIES: Record<string, EnemyDefinition> = {
     name: '暗部隊員',
     description: '木葉暗部的精銳成員，實力深不可測。',
     stats: { maxHp: 140, atk: 17, def: 6, spd: 7 },
+    specialAbility: 'DEBUFF',
+    specialAbilityChance: 0.25,
   },
   MOUNTAIN_BEAR: {
     id: 'MOUNTAIN_BEAR',
@@ -322,8 +329,8 @@ export const ENEMIES: Record<string, EnemyDefinition> = {
     name: '砂忍精英',
     description: '風之國砂隱村的精英忍者，善於防禦。',
     stats: { maxHp: 160, atk: 22, def: 10, spd: 6 },
-    specialAbility: 'GUARD',
-    specialAbilityChance: 0.3,
+    specialAbility: 'HEAL',
+    specialAbilityChance: 0.30,
   },
   GUARDIAN: {
     id: 'GUARDIAN',
@@ -352,6 +359,8 @@ export const ENEMIES: Record<string, EnemyDefinition> = {
     name: '叛忍',
     description: '脫離村莊的危險叛忍，實力強大且不擇手段。',
     stats: { maxHp: 400, atk: 40, def: 16, spd: 11 },
+    specialAbility: 'DEBUFF',
+    specialAbilityChance: 0.25,
   },
   AKATSUKI_MEMBER: {
     id: 'AKATSUKI_MEMBER',
@@ -372,6 +381,8 @@ export const ENEMIES: Record<string, EnemyDefinition> = {
     name: '傳說忍者',
     description: '名留青史的傳說忍者，速度與力量無人能及。',
     stats: { maxHp: 450, atk: 55, def: 20, spd: 19 },
+    specialAbility: 'MULTI_HIT',
+    specialAbilityChance: 0.35,
   },
   CURSED_SEAL_USER: {
     id: 'CURSED_SEAL_USER',
@@ -403,6 +414,7 @@ export const QUESTS: QuestDefinition[] = [
     targetCount: 5,
     reward: { exp: 50, ryo: 80 },
     repeatType: 'DAILY',
+    staminaCost: 5,
   },
   {
     id: 'WOLF_QUEST',
@@ -415,6 +427,7 @@ export const QUESTS: QuestDefinition[] = [
     targetCount: 3,
     reward: { exp: 100, ryo: 100 },
     repeatType: 'DAILY',
+    staminaCost: 5,
   },
   {
     id: 'BANDIT_QUEST',
@@ -427,6 +440,7 @@ export const QUESTS: QuestDefinition[] = [
     targetCount: 2,
     reward: { exp: 170, ryo: 145 },
     repeatType: 'DAILY',
+    staminaCost: 8,
   },
   {
     id: 'ELITE_QUEST',
@@ -439,6 +453,7 @@ export const QUESTS: QuestDefinition[] = [
     targetCount: 1,
     reward: { exp: 260, ryo: 200 },
     repeatType: 'DAILY',
+    staminaCost: 8,
   },
   {
     id: 'BEAR_QUEST',
@@ -451,6 +466,7 @@ export const QUESTS: QuestDefinition[] = [
     targetCount: 3,
     reward: { exp: 360, ryo: 270 },
     repeatType: 'DAILY',
+    staminaCost: 8,
   },
   {
     id: 'CHUNIN_QUEST',
@@ -463,6 +479,7 @@ export const QUESTS: QuestDefinition[] = [
     targetCount: 2,
     reward: { exp: 420, ryo: 290 },
     repeatType: 'DAILY',
+    staminaCost: 10,
   },
   {
     id: 'MONK_QUEST',
@@ -475,6 +492,7 @@ export const QUESTS: QuestDefinition[] = [
     targetCount: 2,
     reward: { exp: 460, ryo: 330 },
     repeatType: 'DAILY',
+    staminaCost: 10,
   },
   {
     id: 'ELITE2_QUEST',
@@ -487,6 +505,7 @@ export const QUESTS: QuestDefinition[] = [
     targetCount: 3,
     reward: { exp: 560, ryo: 390 },
     repeatType: 'DAILY',
+    staminaCost: 12,
   },
   {
     id: 'BOSS_QUEST',
@@ -499,6 +518,7 @@ export const QUESTS: QuestDefinition[] = [
     targetCount: 1,
     reward: { exp: 700, ryo: 500, rankExp: 1 },
     repeatType: 'ONCE',
+    staminaCost: 15,
   },
   // ── Rank D quests ─────────────────────────────────────────────────────────
   {
@@ -512,6 +532,7 @@ export const QUESTS: QuestDefinition[] = [
     targetCount: 5,
     reward: { exp: 800, ryo: 500 },
     repeatType: 'DAILY',
+    staminaCost: 8,
   },
   {
     id: 'D_PUPPET_QUEST',
@@ -524,6 +545,7 @@ export const QUESTS: QuestDefinition[] = [
     targetCount: 2,
     reward: { exp: 1200, ryo: 750 },
     repeatType: 'DAILY',
+    staminaCost: 10,
   },
   {
     id: 'D_ROGUE_QUEST',
@@ -536,6 +558,7 @@ export const QUESTS: QuestDefinition[] = [
     targetCount: 2,
     reward: { exp: 1500, ryo: 900 },
     repeatType: 'DAILY',
+    staminaCost: 12,
   },
   {
     id: 'D_BOSS_QUEST',
@@ -548,6 +571,7 @@ export const QUESTS: QuestDefinition[] = [
     targetCount: 1,
     reward: { exp: 2500, ryo: 1500, rankExp: 1 },
     repeatType: 'ONCE',
+    staminaCost: 20,
   },
   // ── Rank C quests ─────────────────────────────────────────────────────────
   {
@@ -561,6 +585,7 @@ export const QUESTS: QuestDefinition[] = [
     targetCount: 5,
     reward: { exp: 2000, ryo: 1000 },
     repeatType: 'DAILY',
+    staminaCost: 12,
   },
   {
     id: 'C_LEGEND_QUEST',
@@ -573,6 +598,7 @@ export const QUESTS: QuestDefinition[] = [
     targetCount: 2,
     reward: { exp: 2800, ryo: 1400 },
     repeatType: 'DAILY',
+    staminaCost: 15,
   },
   {
     id: 'C_CURSED_QUEST',
@@ -585,6 +611,7 @@ export const QUESTS: QuestDefinition[] = [
     targetCount: 2,
     reward: { exp: 3200, ryo: 1600 },
     repeatType: 'DAILY',
+    staminaCost: 18,
   },
   {
     id: 'C_BOSS_QUEST',
@@ -597,6 +624,7 @@ export const QUESTS: QuestDefinition[] = [
     targetCount: 1,
     reward: { exp: 5000, ryo: 3000, rankExp: 1 },
     repeatType: 'ONCE',
+    staminaCost: 25,
   },
 ];
 
@@ -646,4 +674,15 @@ export const ITEMS: Record<string, ItemDefinition> = {
   ATK_SCROLL: { id: 'ATK_SCROLL', name: '攻擊強化卷軸', description: '戰鬥中ATK+20%，持續5回合', type: 'SCROLL', price: 350, effect: { atkMultiplier: 1.2, buffDuration: 5 }, usableInCombat: true, usableOutOfCombat: false },
   DEF_SCROLL: { id: 'DEF_SCROLL', name: '防禦強化卷軸', description: '戰鬥中DEF+25%，持續5回合', type: 'SCROLL', price: 300, effect: { defMultiplier: 1.25, buffDuration: 5 }, usableInCombat: true, usableOutOfCombat: false },
   SPD_SCROLL: { id: 'SPD_SCROLL', name: '速度強化卷軸', description: '戰鬥中SPD+3，持續5回合', type: 'SCROLL', price: 280, effect: { spdBonus: 3, buffDuration: 5 }, usableInCombat: true, usableOutOfCombat: false },
+  STAMINA_PILL: { id: 'STAMINA_PILL', name: '精力丹', description: '恢復 30 精力', type: 'POTION', price: 120, effect: { staminaRestore: 30 }, usableInCombat: false, usableOutOfCombat: true },
 };
+
+export const QUEST_ZONES: { zone: string; emoji: string; questIds: string[] }[] = [
+  { zone: '木葉忍者學校', emoji: '🏫', questIds: ['GRIND_QUEST', 'WOLF_QUEST'] },
+  { zone: '音忍邊境', emoji: '🎵', questIds: ['BANDIT_QUEST'] },
+  { zone: '木葉暗部道場', emoji: '🌿', questIds: ['ELITE_QUEST', 'CHUNIN_QUEST', 'ELITE2_QUEST'] },
+  { zone: '山中通道', emoji: '🏔️', questIds: ['BEAR_QUEST', 'MONK_QUEST'] },
+  { zone: '最終試煉', emoji: '🌀', questIds: ['BOSS_QUEST'] },
+  { zone: '中忍領域', emoji: '🏯', questIds: ['D_PATROL_QUEST', 'D_PUPPET_QUEST', 'D_ROGUE_QUEST', 'D_BOSS_QUEST'] },
+  { zone: '上忍領域', emoji: '⚔️', questIds: ['C_ANBU_QUEST', 'C_LEGEND_QUEST', 'C_CURSED_QUEST', 'C_BOSS_QUEST'] },
+];

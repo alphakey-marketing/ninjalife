@@ -1,6 +1,6 @@
 import { useGame } from '../gameStore';
-import { BLOODLINES, EXP_PER_LEVEL, getLevelCapForRank, RANK_DISPLAY } from '../constants';
-import { canRankUp, calcPlayerMaxHp } from '../gameLogic';
+import { BLOODLINES, EXP_PER_LEVEL, getLevelCapForRank, QUESTS, RANK_DISPLAY } from '../constants';
+import { canRankUp, calcPlayerMaxHp, getTodayString } from '../gameLogic';
 
 export function HubScreen() {
   const { state, dispatch } = useGame();
@@ -12,6 +12,14 @@ export function HubScreen() {
   const hpPct = Math.max(0, Math.min(100, (player.stats.hp / maxHp) * 100));
   const mdPct = Math.max(0, Math.min(100, (player.stats.md / player.stats.maxMd) * 100));
   const expPct = expNeeded > 0 ? Math.max(0, Math.min(100, (player.stats.exp / expNeeded) * 100)) : 100;
+  const staminaPct = Math.max(0, Math.min(100, (player.stamina / player.maxStamina) * 100));
+
+  const todayStr = getTodayString();
+  const dailyQuests = QUESTS.filter(q => q.requiredRank === player.rank && q.repeatType === 'DAILY');
+  const completedToday = dailyQuests.filter(q => {
+    const ts = player.questResetTimestamps?.[q.id];
+    return ts !== undefined && new Date(ts).toISOString().slice(0, 10) === todayStr;
+  }).length;
 
   return (
     <div className="screen">
@@ -44,6 +52,15 @@ export function HubScreen() {
             </div>
             <div className="hp-bar">
               <div className="hp-bar-fill md-fill" style={{ width: `${mdPct}%` }} />
+            </div>
+          </div>
+          <div className="hp-bar-container">
+            <div className="hp-bar-label">
+              <span className="text-orange">精力</span>
+              <span>{player.stamina} / {player.maxStamina}</span>
+            </div>
+            <div className="hp-bar">
+              <div className="hp-bar-fill stamina-fill" style={{ width: `${staminaPct}%` }} />
             </div>
           </div>
           {player.stats.level < levelCap && (
@@ -90,6 +107,14 @@ export function HubScreen() {
         {player.unlockedMode && !player.isInMode && (
           <div className="text-small text-gray" style={{ marginTop: '4px' }}>仙人模式已解鎖（可在戰鬥中啟動）</div>
         )}
+      </div>
+
+      {/* Daily Quest Summary */}
+      <div className="card">
+        <div className="flex-row" style={{ justifyContent: 'space-between' }}>
+          <span className="text-small">📅 今日任務：</span>
+          <span className="text-small text-gold">{completedToday}/{dailyQuests.length} 完成</span>
+        </div>
       </div>
 
       {/* Navigation */}

@@ -73,6 +73,17 @@ export function CombatScreen() {
                 ))}
               </div>
             )}
+            {battle.playerStatusEffects && battle.playerStatusEffects.length > 0 && (
+              <div className="flex-row" style={{ marginTop: '4px', flexWrap: 'wrap', gap: '4px' }}>
+                {battle.playerStatusEffects.map((effect, i) => (
+                  effect.type === 'ATK_DOWN' && (
+                    <span key={i} className="debuff-badge">
+                      💜 攻擊↓{Math.round((effect.atkDebuffPercent ?? 0) * 100)}% ({effect.remainingTurns}t)
+                    </span>
+                  )
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="vs-text">VS</div>
@@ -84,6 +95,8 @@ export function CombatScreen() {
               {enemy.statusEffects.find(e => e.type === 'BURN') && <span className="text-red"> 🔥</span>}
               {enemy.isGuarding && <span className="text-blue"> 🛡</span>}
               {enemy.chargeReady && <span className="text-gold"> ⚡</span>}
+              {enemy.definition.specialAbility === 'HEAL' && <span className="text-green"> 💚</span>}
+              {enemy.definition.specialAbility === 'MULTI_HIT' && <span className="text-gold"> ⚡⚡</span>}
             </div>
             <div className="hp-bar-container">
               <div className="hp-bar-label">
