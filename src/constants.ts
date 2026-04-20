@@ -633,6 +633,8 @@ export const ATK_PER_STR = 2;
 export const HP_PER_VIT = 20;
 export const MD_PER_FOC = 10;
 
+export const RARE_BLOODLINE_IDS = ['STORM', 'MIST', 'VOID', 'SAND', 'LIGHTNING_BL', 'SHADOW', 'KAGUYA'];
+
 export const ITEMS: Record<string, ItemDefinition> = {
   SMALL_POTION: { id: 'SMALL_POTION', name: '小型丹藥', description: '回復30HP', type: 'POTION', price: 80, effect: { hpRestore: 30 }, usableInCombat: true, usableOutOfCombat: true },
   LARGE_POTION: { id: 'LARGE_POTION', name: '大型丹藥', description: '回復40%HP', type: 'POTION', price: 200, effect: { hpRestorePercent: 0.4 }, usableInCombat: true, usableOutOfCombat: true },

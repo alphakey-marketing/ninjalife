@@ -398,17 +398,18 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           // Support both new format { saveVersion, player } and legacy format (raw player)
           const rawPlayer = (raw.saveVersion !== undefined ? raw.player : raw) as PlayerState & { freeRestUsedToday?: boolean };
           // Patch any missing fields added in later save versions
-          const freeRestUsedToday = (rawPlayer as { freeRestUsedToday?: boolean }).freeRestUsedToday ?? false;
-          const { freeRestUsedToday: _removed, ...cleanPlayer } = rawPlayer as typeof rawPlayer & { freeRestUsedToday?: boolean };
-          void _removed;
+          const freeRestUsedToday = rawPlayer.freeRestUsedToday ?? false;
+          // Build clean player without deprecated freeRestUsedToday field
+          const { freeRestUsedToday: _deprecated, ...cleanPlayer } = rawPlayer;
           const player: PlayerState = {
             ...cleanPlayer,
             completedQuestIds: rawPlayer.completedQuestIds ?? [],
-            lastFreeRestDate: rawPlayer.lastFreeRestDate ?? (freeRestUsedToday ? getTodayString() : ''),
+            lastFreeRestDate: rawPlayer.lastFreeRestDate ?? (_deprecated ? getTodayString() : ''),
             inventory: rawPlayer.inventory ?? [],
             activeBuffs: rawPlayer.activeBuffs ?? [],
             questResetTimestamps: rawPlayer.questResetTimestamps ?? {},
           };
+          void freeRestUsedToday; // only used via _deprecated above
           return notify({ ...state, player, screen: 'HUB', battle: null }, '遊戲已讀取！');
         }
         return notify(state, '找不到存檔！');

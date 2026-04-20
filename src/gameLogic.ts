@@ -1,4 +1,4 @@
-import { BLOODLINES, CLINIC_COSTS, EXP_PER_LEVEL, getLevelCapForRank, ITEMS, MD_REGEN_BASE, MODE_CONFIG, SKILLS, SPIN_CONFIG, STAT_POINTS_PER_LEVEL } from './constants';
+import { BLOODLINES, CLINIC_COSTS, EXP_PER_LEVEL, getLevelCapForRank, ITEMS, MD_REGEN_BASE, MODE_CONFIG, RARE_BLOODLINE_IDS, SKILLS, SPIN_CONFIG, STAT_POINTS_PER_LEVEL } from './constants';
 import type { ActiveBuff, BattleState, InventoryItem, PlayerState, QuestDefinition, SkillDefinition } from './types';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -463,7 +463,7 @@ export function performSpin(player: PlayerState): { player: PlayerState; result:
   }
 
   const rarityBonus = player.rankBonus.spinRarityBonus;
-  const rareIds = ['STORM', 'MIST', 'VOID', 'SAND', 'LIGHTNING_BL', 'SHADOW', 'KAGUYA'];
+  const rareIds = RARE_BLOODLINE_IDS;
   const entries = SPIN_CONFIG.entries.map(e => {
     let weight = e.baseWeight;
     if (rareIds.includes(e.bloodlineId)) {

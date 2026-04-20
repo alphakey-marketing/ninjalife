@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useGame } from '../gameStore';
-import { BLOODLINES, SPIN_CONFIG } from '../constants';
+import { BLOODLINES, RARE_BLOODLINE_IDS, SPIN_CONFIG } from '../constants';
 
 const rarityEmoji: Record<string, string> = {
   COMMON: '◆',
@@ -21,7 +21,7 @@ export function SpinScreen() {
     }, 800);
   };
 
-  const rareIds = ['STORM', 'MIST', 'VOID', 'SAND', 'LIGHTNING_BL', 'SHADOW', 'KAGUYA'];
+  const rareIds = RARE_BLOODLINE_IDS;
   const totalWeight = SPIN_CONFIG.entries.reduce((sum, e) => {
     const bonus = rareIds.includes(e.bloodlineId) ? player.rankBonus.spinRarityBonus * 100 : 0;
     return sum + e.baseWeight + bonus;
