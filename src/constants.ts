@@ -1,5 +1,8 @@
 import type { BloodlineDefinition, EnemyDefinition, ItemDefinition, ModeConfig, QuestDefinition, RankDefinition, Rank, SkillDefinition, SpinConfig } from './types';
 
+// Save version history:
+// 1 → 2: Added completedQuestIds, freeRestUsedToday
+// 2 → 3: Added inventory, activeBuffs, questResetTimestamps; migrated freeRestUsedToday → lastFreeRestDate (YYYY-MM-DD)
 export const SAVE_VERSION = 3;
 export const MD_REGEN_BASE = 5;
 
@@ -246,9 +249,9 @@ export const BLOODLINES: Record<string, BloodlineDefinition> = {
   },
   KAGUYA: {
     id: 'KAGUYA',
-    name: '鬼燈一族（骨遁）',
+    name: '輝夜一族（屍骨脈）',
     rarity: 'LEGENDARY',
-    description: '鬼燈一族的骨遁血統，攻擊力強大但以生命力為代價。',
+    description: '輝夜一族的屍骨脈血統，以骨骼為武器，攻擊力強大但以生命力為代價。',
     passive: { atkMultiplier: 1.45, hpMultiplier: 0.85 },
     skillIds: ['BONE_LANCE'],
   },
