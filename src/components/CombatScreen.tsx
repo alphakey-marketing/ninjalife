@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useGame } from '../gameStore';
-import { BLOODLINES, QUESTS, SKILLS } from '../constants';
+import { BLOODLINES, ITEMS, QUESTS, SKILLS } from '../constants';
 import { calcPlayerMaxHp } from '../gameLogic';
 
 export function CombatScreen() {
@@ -64,6 +64,15 @@ export function CombatScreen() {
               </div>
               <div className="hp-bar"><div className="hp-bar-fill md-fill" style={{ width: `${mdPct}%` }} /></div>
             </div>
+            {player.activeBuffs && player.activeBuffs.length > 0 && (
+              <div className="flex-row" style={{ marginTop: '4px', flexWrap: 'wrap', gap: '4px' }}>
+                {player.activeBuffs.map((buff, i) => (
+                  <span key={i} className="buff-badge">
+                    {ITEMS[buff.itemId]?.name ?? buff.itemId} ({buff.remainingTurns}t)
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="vs-text">VS</div>
@@ -139,6 +148,20 @@ export function CombatScreen() {
             <button className="btn btn-danger" onClick={() => dispatch({ type: 'BATTLE_RUN' })}>
               🏃 逃跑
             </button>
+            {canAct && player.inventory && player.inventory.filter(inv => ITEMS[inv.itemId]?.usableInCombat && inv.quantity > 0).length > 0 && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <div className="text-small text-gray" style={{ marginBottom: '4px' }}>🎒 道具</div>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {player.inventory.filter(inv => ITEMS[inv.itemId]?.usableInCombat && inv.quantity > 0).map(inv => (
+                    <button key={inv.itemId} className="btn" style={{ fontSize: '0.8rem' }}
+                      onClick={() => dispatch({ type: 'BATTLE_USE_ITEM', itemId: inv.itemId })}
+                    >
+                      {ITEMS[inv.itemId].name} ×{inv.quantity}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

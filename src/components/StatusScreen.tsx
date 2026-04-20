@@ -1,5 +1,5 @@
 import { useGame } from '../gameStore';
-import { BLOODLINES, EXP_PER_LEVEL, RANK_DISPLAY, SKILLS } from '../constants';
+import { BLOODLINES, EXP_PER_LEVEL, getLevelCapForRank, RANK_DISPLAY, SKILLS } from '../constants';
 import { calcMdRegen, calcPlayerAtk, calcPlayerDef, calcPlayerMaxHp, calcPlayerSpd } from '../gameLogic';
 
 export function StatusScreen() {
@@ -26,8 +26,8 @@ export function StatusScreen() {
       {/* Core Stats */}
       <div className="card">
         <div className="card-title">Core Stats</div>
-        <div className="stat-row"><span className="stat-label">Level</span><span className="stat-value">{player.stats.level} / 30</span></div>
-        <div className="stat-row"><span className="stat-label">EXP</span><span className="stat-value">{player.stats.exp} / {player.stats.level < 30 ? EXP_PER_LEVEL(player.stats.level) : 'MAX'}</span></div>
+        <div className="stat-row"><span className="stat-label">Level</span><span className="stat-value">{player.stats.level} / {getLevelCapForRank(player.rank)}</span></div>
+        <div className="stat-row"><span className="stat-label">EXP</span><span className="stat-value">{player.stats.exp} / {player.stats.level < getLevelCapForRank(player.rank) ? EXP_PER_LEVEL(player.stats.level) : 'MAX'}</span></div>
         <div className="stat-row"><span className="stat-label">HP</span><span className="stat-value">{player.stats.hp} / {effMaxHp}</span></div>
         <div className="stat-row"><span className="stat-label">Chakra</span><span className="stat-value">{player.stats.md} / {player.stats.maxMd}</span></div>
         <div className="stat-row"><span className="stat-label">Chakra 回復/回合</span><span className="stat-value-gold">+{mdRegen}</span></div>
@@ -147,7 +147,7 @@ export function StatusScreen() {
         {player.rank !== 'C' && (
           <div className="stat-row">
             <span className="stat-label">Rank Up Condition</span>
-            <span className="text-small">LV30 + BOSS clear</span>
+            <span className="text-small">LV{getLevelCapForRank(player.rank)} + BOSS clear</span>
           </div>
         )}
         <div className="stat-row">

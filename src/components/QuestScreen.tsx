@@ -1,5 +1,6 @@
 import { useGame } from '../gameStore';
 import { ENEMIES, QUESTS } from '../constants';
+import { getTodayString } from '../gameLogic';
 
 const questTypeLabel: Record<string, string> = {
   GRIND: '⚔ GRIND',
@@ -11,6 +12,8 @@ export function QuestScreen() {
   const { state, dispatch } = useGame();
   const { player } = state;
 
+  const rankQuests = QUESTS.filter(q => q.requiredRank === player.rank);
+
   return (
     <div className="screen">
       <div className="header-bar">
@@ -21,20 +24,26 @@ export function QuestScreen() {
 
       <div className="card">
         <div className="card-title">Available Quests</div>
-        {QUESTS.map(quest => {
+        {rankQuests.map(quest => {
           const isLocked = player.stats.level < quest.requiredLevel;
-          const isCompleted = player.completedQuestIds.includes(quest.id);
+          const isOnceDone = quest.repeatType === 'ONCE' && player.completedQuestIds.includes(quest.id);
+          const isDailyDone = quest.repeatType === 'DAILY' && (() => {
+            const ts = player.questResetTimestamps?.[quest.id];
+            if (!ts) return false;
+            return new Date(ts).toISOString().slice(0, 10) === getTodayString();
+          })();
+          const unavailable = isOnceDone || isDailyDone;
           const enemyDef = ENEMIES[quest.targetEnemyId];
           return (
             <div
               key={quest.id}
-              className={`quest-item quest-type-${quest.type} ${isLocked ? 'locked' : ''}`}
-              onClick={() => !isLocked && dispatch({ type: 'START_QUEST', questId: quest.id })}
+              className={`quest-item quest-type-${quest.type} ${isLocked ? 'locked' : ''} ${isDailyDone ? 'quest-daily-done' : ''} ${isOnceDone ? 'quest-available' : ''}`}
+              onClick={() => !isLocked && !unavailable && dispatch({ type: 'START_QUEST', questId: quest.id })}
             >
               <div className="flex-row" style={{ justifyContent: 'space-between' }}>
                 <span className="text-bold">
                   {quest.name}
-                  {isCompleted && <span className="text-green"> ✓</span>}
+                  {isOnceDone && <span className="text-green"> ✓</span>}
                 </span>
                 <span className="text-small">{questTypeLabel[quest.type]}</span>
               </div>
@@ -50,6 +59,16 @@ export function QuestScreen() {
               {isLocked && (
                 <div className="text-small text-red" style={{ marginTop: '4px' }}>
                   🔒 Requires LV {quest.requiredLevel}
+                </div>
+              )}
+              {isDailyDone && (
+                <div className="text-small text-gray" style={{ marginTop: '4px' }}>
+                  🔄 明日重置
+                </div>
+              )}
+              {isOnceDone && (
+                <div className="text-small text-green" style={{ marginTop: '4px' }}>
+                  ✓ 已完成（不可重複）
                 </div>
               )}
             </div>

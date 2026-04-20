@@ -2,7 +2,34 @@ export type Rarity = 'COMMON' | 'RARE' | 'LEGENDARY';
 export type QuestType = 'GRIND' | 'ELITE' | 'BOSS';
 export type Rank = 'E' | 'D' | 'C';
 export type ActionType = 'ATTACK' | 'SKILL' | 'TOGGLE_MODE' | 'RUN';
-export type Screen = 'HUB' | 'QUEST' | 'COMBAT' | 'SPIN' | 'STATUS' | 'CLINIC';
+export type Screen = 'HUB' | 'QUEST' | 'COMBAT' | 'SPIN' | 'STATUS' | 'CLINIC' | 'SHOP';
+export type QuestRepeatType = 'DAILY' | 'ONCE';
+export type ItemType = 'POTION' | 'CHAKRA_PILL' | 'SCROLL';
+
+export interface ItemEffect {
+  hpRestore?: number;
+  hpRestorePercent?: number;
+  mdRestore?: number;
+  mdRestorePercent?: number;
+  atkMultiplier?: number;
+  defMultiplier?: number;
+  spdBonus?: number;
+  buffDuration?: number;
+}
+
+export interface ItemDefinition {
+  id: string;
+  name: string;
+  description: string;
+  type: ItemType;
+  price: number;
+  effect: ItemEffect;
+  usableInCombat: boolean;
+  usableOutOfCombat: boolean;
+}
+
+export interface InventoryItem { itemId: string; quantity: number; }
+export interface ActiveBuff { itemId: string; remainingTurns: number; atkMultiplier?: number; defMultiplier?: number; spdBonus?: number; }
 
 export interface PlayerStats {
   level: number;
@@ -45,7 +72,10 @@ export interface PlayerState {
   currentQuestId: string | null;
   bossDefeatedThisRank: boolean;
   completedQuestIds: string[];
-  freeRestUsedToday: boolean;
+  lastFreeRestDate: string;
+  inventory: InventoryItem[];
+  activeBuffs: ActiveBuff[];
+  questResetTimestamps: Record<string, number>;
 }
 
 export interface SkillEffectNumbers {
@@ -117,9 +147,11 @@ export interface QuestDefinition {
   description: string;
   type: QuestType;
   requiredLevel: number;
+  requiredRank: Rank;
   targetEnemyId: string;
   targetCount: number;
   reward: QuestReward;
+  repeatType: QuestRepeatType;
 }
 
 export interface EnemyStats {

@@ -1,6 +1,6 @@
 import { useGame } from '../gameStore';
 import { CLINIC_COSTS } from '../constants';
-import { calcPlayerMaxHp } from '../gameLogic';
+import { calcPlayerMaxHp, getTodayString } from '../gameLogic';
 
 export function ClinicScreen() {
   const { state, dispatch } = useGame();
@@ -11,6 +11,7 @@ export function ClinicScreen() {
 
   const payBracket = CLINIC_COSTS.find(b => player.stats.level <= b.maxLevel) ?? CLINIC_COSTS[CLINIC_COSTS.length - 1];
   const payCost = payBracket.cost;
+  const freeRestUsedToday = player.lastFreeRestDate === getTodayString();
 
   return (
     <div className="screen">
@@ -49,7 +50,7 @@ export function ClinicScreen() {
         <div className="text-small text-gray" style={{ marginBottom: '12px' }}>
           回復 50% HP + 50% Chakra。每日限使用一次。
         </div>
-        {player.freeRestUsedToday ? (
+        {freeRestUsedToday ? (
           <div className="text-small text-red" style={{ marginBottom: '8px' }}>
             ✗ 今日已使用免費休息
           </div>
@@ -61,7 +62,7 @@ export function ClinicScreen() {
         <button
           className="btn btn-primary"
           style={{ width: '100%' }}
-          disabled={player.freeRestUsedToday}
+          disabled={freeRestUsedToday}
           onClick={() => dispatch({ type: 'REST_FREE' })}
         >
           😴 免費休息（+50% HP / Chakra）

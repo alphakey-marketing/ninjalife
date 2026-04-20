@@ -1,13 +1,14 @@
 import { useGame } from '../gameStore';
+import { BLOODLINES, EXP_PER_LEVEL, getLevelCapForRank, RANK_DISPLAY } from '../constants';
 import { canRankUp, calcPlayerMaxHp } from '../gameLogic';
-import { BLOODLINES, EXP_PER_LEVEL, RANK_DISPLAY } from '../constants';
 
 export function HubScreen() {
   const { state, dispatch } = useGame();
   const { player } = state;
   const equipped = player.equippedBloodlineId ? BLOODLINES[player.equippedBloodlineId] : null;
   const maxHp = calcPlayerMaxHp(player);
-  const expNeeded = player.stats.level < 30 ? EXP_PER_LEVEL(player.stats.level) : 0;
+  const levelCap = getLevelCapForRank(player.rank);
+  const expNeeded = player.stats.level < levelCap ? EXP_PER_LEVEL(player.stats.level) : 0;
   const hpPct = Math.max(0, Math.min(100, (player.stats.hp / maxHp) * 100));
   const mdPct = Math.max(0, Math.min(100, (player.stats.md / player.stats.maxMd) * 100));
   const expPct = expNeeded > 0 ? Math.max(0, Math.min(100, (player.stats.exp / expNeeded) * 100)) : 100;
@@ -45,7 +46,7 @@ export function HubScreen() {
               <div className="hp-bar-fill md-fill" style={{ width: `${mdPct}%` }} />
             </div>
           </div>
-          {player.stats.level < 30 && (
+          {player.stats.level < levelCap && (
             <div className="hp-bar-container">
               <div className="hp-bar-label">
                 <span className="text-green">EXP (LV{player.stats.level})</span>
@@ -56,10 +57,10 @@ export function HubScreen() {
               </div>
             </div>
           )}
-          {player.stats.level >= 30 && (
+          {player.stats.level >= levelCap && (
             <div className="stat-row">
               <span className="stat-label">Level</span>
-              <span className="stat-value-gold">MAX (30)</span>
+              <span className="stat-value-gold">MAX ({levelCap})</span>
             </div>
           )}
         </div>
@@ -106,6 +107,9 @@ export function HubScreen() {
           </button>
           <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'CLINIC' })}>
             🏥 診療所
+          </button>
+          <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'SHOP' })}>
+            🛒 商店
           </button>
           {canRankUp(player) && (
             <button className="btn btn-success" onClick={() => dispatch({ type: 'RANK_UP' })}>

@@ -319,3 +319,42 @@ body {
   font-weight: bold;
   font-size: 1.2rem;
 }
+
+/* ── Shop ───────────────────────────────────────────────────────────────────── */
+.shop-item {
+  border: 1px solid #2a2a3a;
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 8px;
+  background: #0f0f1a;
+}
+
+.item-entry {
+  padding: 8px 0;
+  border-bottom: 1px solid #1e1e2e;
+}
+
+.item-entry:last-child {
+  border-bottom: none;
+}
+
+/* ── Buff badge ──────────────────────────────────────────────────────────────── */
+.buff-badge {
+  display: inline-block;
+  background: #1a1a4a;
+  border: 1px solid #4040b0;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.75rem;
+  color: #8080ff;
+}
+
+/* ── Quest availability ────────────────────────────────────────────────────── */
+.quest-available {
+  opacity: 0.6;
+}
+
+.quest-daily-done {
+  opacity: 0.5;
+  cursor: default;
+}

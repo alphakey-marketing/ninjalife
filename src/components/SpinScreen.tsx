@@ -21,6 +21,12 @@ export function SpinScreen() {
     }, 800);
   };
 
+  const rareIds = ['STORM', 'MIST', 'VOID', 'SAND', 'LIGHTNING_BL', 'SHADOW', 'KAGUYA'];
+  const totalWeight = SPIN_CONFIG.entries.reduce((sum, e) => {
+    const bonus = rareIds.includes(e.bloodlineId) ? player.rankBonus.spinRarityBonus * 100 : 0;
+    return sum + e.baseWeight + bonus;
+  }, 0);
+
   return (
     <div className="screen">
       <div className="header-bar">
@@ -40,12 +46,14 @@ export function SpinScreen() {
           <div className="text-small text-gray" style={{ marginBottom: '4px' }}>基礎機率：</div>
           {SPIN_CONFIG.entries.map(entry => {
             const bl = BLOODLINES[entry.bloodlineId];
+            const rarityBonus = rareIds.includes(entry.bloodlineId) ? player.rankBonus.spinRarityBonus * 100 : 0;
+            const effectiveWeight = entry.baseWeight + rarityBonus;
             return (
               <div key={entry.bloodlineId} className="stat-row text-small">
                 <span className={`rarity-${bl.rarity.toLowerCase()}`}>
                   {rarityEmoji[bl.rarity]} {bl.name}
                 </span>
-                <span className="text-gray">{entry.baseWeight}%</span>
+                <span className="text-gray">{(effectiveWeight / totalWeight * 100).toFixed(1)}%</span>
               </div>
             );
           })}

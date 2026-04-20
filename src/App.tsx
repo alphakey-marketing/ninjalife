@@ -5,6 +5,7 @@ import { CombatScreen } from './components/CombatScreen';
 import { SpinScreen } from './components/SpinScreen';
 import { StatusScreen } from './components/StatusScreen';
 import { ClinicScreen } from './components/ClinicScreen';
+import { ShopScreen } from './components/ShopScreen';
 import './App.css';
 
 function GameContent() {
@@ -22,6 +23,7 @@ function GameContent() {
       {state.screen === 'SPIN' && <SpinScreen />}
       {state.screen === 'STATUS' && <StatusScreen />}
       {state.screen === 'CLINIC' && <ClinicScreen />}
+      {state.screen === 'SHOP' && <ShopScreen />}
     </>
   );
 }

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  applyItemEffect,
   calcDamage,
   calcEnemyDamage,
   calcMdRegen,
@@ -11,7 +12,9 @@ import {
   checkLevelUp,
   enemyHasFirstStrike,
   equipBloodline,
+  getTodayString,
   hasCritBonus,
+  isQuestAvailableForPlayer,
   performAttack,
   performRankUp,
   performRest,
@@ -36,7 +39,10 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     currentQuestId: null,
     bossDefeatedThisRank: false,
     completedQuestIds: [],
-    freeRestUsedToday: false,
+    lastFreeRestDate: '',
+    inventory: [],
+    activeBuffs: [],
+    questResetTimestamps: {},
     ...overrides,
   };
 }
@@ -265,7 +271,7 @@ describe('checkLevelUp', () => {
     expect(result.statPoints.unspent).toBe(3);
   });
 
-  it('does not exceed LEVEL_CAP', () => {
+  it('does not exceed rank level cap', () => {
     const player = makePlayer({ stats: { ...makePlayer().stats, level: 30, exp: 99999 } });
     expect(checkLevelUp(player).stats.level).toBe(30);
   });
@@ -410,14 +416,15 @@ describe('performRest (FREE)', () => {
     expect(result.stats.md).toBe(Math.min(50, 10 + Math.floor(50 * 0.5)));
   });
 
-  it('marks freeRestUsedToday after use', () => {
+  it('marks lastFreeRestDate after use', () => {
     const player = makePlayer();
     const { player: result } = performRest(player, 'FREE');
-    expect(result.freeRestUsedToday).toBe(true);
+    expect(result.lastFreeRestDate).toBe(getTodayString());
+    expect(result.lastFreeRestDate).not.toBe('');
   });
 
   it('fails when free rest already used today', () => {
-    const player = makePlayer({ freeRestUsedToday: true });
+    const player = makePlayer({ lastFreeRestDate: getTodayString() });
     const { success, player: unchanged } = performRest(player, 'FREE');
     expect(success).toBe(false);
     expect(unchanged).toBe(player);
@@ -476,5 +483,124 @@ describe('New quests (phase 1.3)', () => {
     expect(quest!.targetEnemyId).toBe('GUARDIAN');
     expect(quest!.reward.exp).toBe(700);
     expect(quest!.reward.ryo).toBe(500);
+  });
+});
+
+// ── isQuestAvailableForPlayer ─────────────────────────────────────────────────
+
+describe('isQuestAvailableForPlayer', () => {
+  const onceQuest = QUESTS.find(q => q.repeatType === 'ONCE')!;
+  const dailyQuest = QUESTS.find(q => q.repeatType === 'DAILY')!;
+
+  it('ONCE quest is available when not completed', () => {
+    const player = makePlayer();
+    expect(isQuestAvailableForPlayer(onceQuest, player)).toBe(true);
+  });
+
+  it('ONCE quest is unavailable when completed', () => {
+    const player = makePlayer({ completedQuestIds: [onceQuest.id] });
+    expect(isQuestAvailableForPlayer(onceQuest, player)).toBe(false);
+  });
+
+  it('DAILY quest is available when never done', () => {
+    const player = makePlayer();
+    expect(isQuestAvailableForPlayer(dailyQuest, player)).toBe(true);
+  });
+
+  it('DAILY quest is unavailable when done today', () => {
+    const player = makePlayer({ questResetTimestamps: { [dailyQuest.id]: Date.now() } });
+    expect(isQuestAvailableForPlayer(dailyQuest, player)).toBe(false);
+  });
+
+  it('DAILY quest is available when done on a different date', () => {
+    // yesterday = 24h ago
+    const yesterday = Date.now() - 24 * 60 * 60 * 1000;
+    const player = makePlayer({ questResetTimestamps: { [dailyQuest.id]: yesterday } });
+    expect(isQuestAvailableForPlayer(dailyQuest, player)).toBe(true);
+  });
+});
+
+// ── applyItemEffect ───────────────────────────────────────────────────────────
+
+describe('applyItemEffect', () => {
+  it('restores HP with SMALL_POTION', () => {
+    const player = makePlayer({
+      stats: { ...makePlayer().stats, hp: 30 },
+      inventory: [{ itemId: 'SMALL_POTION', quantity: 1 }],
+    });
+    const { player: result, success } = applyItemEffect(player, 'SMALL_POTION');
+    expect(success).toBe(true);
+    expect(result.stats.hp).toBe(60); // 30 + 30
+  });
+
+  it('removes item from inventory after use', () => {
+    const player = makePlayer({
+      inventory: [{ itemId: 'SMALL_POTION', quantity: 1 }],
+    });
+    const { player: result } = applyItemEffect(player, 'SMALL_POTION');
+    expect(result.inventory.find(i => i.itemId === 'SMALL_POTION')).toBeUndefined();
+  });
+
+  it('decrements quantity when multiple in inventory', () => {
+    const player = makePlayer({
+      inventory: [{ itemId: 'SMALL_POTION', quantity: 3 }],
+    });
+    const { player: result } = applyItemEffect(player, 'SMALL_POTION');
+    expect(result.inventory.find(i => i.itemId === 'SMALL_POTION')?.quantity).toBe(2);
+  });
+
+  it('restores Chakra with CHAKRA_PILL', () => {
+    const player = makePlayer({
+      stats: { ...makePlayer().stats, md: 0 },
+      inventory: [{ itemId: 'CHAKRA_PILL', quantity: 1 }],
+    });
+    const { player: result, success } = applyItemEffect(player, 'CHAKRA_PILL');
+    expect(success).toBe(true);
+    expect(result.stats.md).toBe(25);
+  });
+
+  it('fails when item not in inventory', () => {
+    const player = makePlayer();
+    const { success } = applyItemEffect(player, 'SMALL_POTION');
+    expect(success).toBe(false);
+  });
+
+  it('fails for combat-only items (ATK_SCROLL)', () => {
+    const player = makePlayer({
+      inventory: [{ itemId: 'ATK_SCROLL', quantity: 1 }],
+    });
+    const { success } = applyItemEffect(player, 'ATK_SCROLL');
+    expect(success).toBe(false);
+  });
+});
+
+// ── calcPlayerAtk with activeBuffs ────────────────────────────────────────────
+
+describe('calcPlayerAtk with activeBuffs', () => {
+  it('applies atkMultiplier from active buff', () => {
+    const player = makePlayer({
+      activeBuffs: [{ itemId: 'ATK_SCROLL', remainingTurns: 5, atkMultiplier: 1.2 }],
+    });
+    // base 10 * 1.0 (rank) * 1.2 (buff) = 12
+    expect(calcPlayerAtk(player)).toBeCloseTo(12, 5);
+  });
+
+  it('stacks multiple buffs', () => {
+    const player = makePlayer({
+      activeBuffs: [
+        { itemId: 'ATK_SCROLL', remainingTurns: 5, atkMultiplier: 1.2 },
+        { itemId: 'ATK_SCROLL', remainingTurns: 3, atkMultiplier: 1.1 },
+      ],
+    });
+    // 10 * 1.2 * 1.1 = 13.2
+    expect(calcPlayerAtk(player)).toBeCloseTo(13.2, 5);
+  });
+});
+
+// ── getTodayString ────────────────────────────────────────────────────────────
+
+describe('getTodayString', () => {
+  it('returns a YYYY-MM-DD formatted string', () => {
+    expect(getTodayString()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });

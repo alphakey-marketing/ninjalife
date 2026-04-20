@@ -1,18 +1,22 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import type { BattleState, PlayerState, Screen } from './types';
-import { ENEMIES, QUESTS, SAVE_VERSION } from './constants';
+import { ENEMIES, ITEMS, QUESTS, SAVE_VERSION } from './constants';
 import {
+  applyItemEffect,
   applyStatPoint,
   canRankUp,
   calcEnemyDamage,
   checkLevelUp,
   enemyHasFirstStrike,
   equipBloodline,
+  getTodayString,
+  isQuestAvailableForPlayer,
   performAttack,
   performRankUp,
   performRest,
   performSkill,
   performSpin,
+  performUseItemInBattle,
   toggleMode,
 } from './gameLogic';
 
@@ -38,6 +42,9 @@ type GameAction =
   | { type: 'RANK_UP' }
   | { type: 'REST_FREE' }
   | { type: 'REST_PAY' }
+  | { type: 'BUY_ITEM'; itemId: string }
+  | { type: 'USE_ITEM'; itemId: string }
+  | { type: 'BATTLE_USE_ITEM'; itemId: string }
   | { type: 'SAVE_GAME' }
   | { type: 'LOAD_GAME' }
   | { type: 'DEQUEUE_NOTIFICATION' };
@@ -66,7 +73,10 @@ const initialPlayer: PlayerState = {
   currentQuestId: null,
   bossDefeatedThisRank: false,
   completedQuestIds: [],
-  freeRestUsedToday: false,
+  lastFreeRestDate: '',
+  inventory: [],
+  activeBuffs: [],
+  questResetTimestamps: {},
 };
 
 const initialState: GameState = {
@@ -135,6 +145,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'START_QUEST': {
       const quest = QUESTS.find(q => q.id === action.questId);
       if (!quest) return state;
+      if (quest.requiredRank !== state.player.rank) {
+        return notify(state, 'Rank 不符！');
+      }
+      if (!isQuestAvailableForPlayer(quest, state.player)) {
+        return notify(state, quest.repeatType === 'ONCE' ? '此任務已完成！' : '今日任務已完成，明日再來！');
+      }
       if (state.player.stats.level < quest.requiredLevel) {
         return notify(state, `Requires Level ${quest.requiredLevel}!`);
       }
@@ -247,10 +263,17 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const preRewardLevel = state.player.stats.level;
       let player = { ...state.player };
 
-      // Mark quest as completed (first-time tracking)
-      const completedQuestIds = player.completedQuestIds.includes(quest.id)
-        ? player.completedQuestIds
-        : [...player.completedQuestIds, quest.id];
+      // Track quest completion
+      let completedQuestIds = player.completedQuestIds;
+      let questResetTimestamps = { ...player.questResetTimestamps };
+      if (quest.repeatType === 'ONCE') {
+        if (!completedQuestIds.includes(quest.id)) {
+          completedQuestIds = [...completedQuestIds, quest.id];
+        }
+      } else {
+        // DAILY: record timestamp
+        questResetTimestamps = { ...questResetTimestamps, [quest.id]: Date.now() };
+      }
 
       player = {
         ...player,
@@ -266,6 +289,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         currentQuestId: null,
         isInMode: false,
         completedQuestIds,
+        questResetTimestamps,
       };
 
       player = checkLevelUp(player);
@@ -331,6 +355,32 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       return notify(newState, message);
     }
 
+    case 'BUY_ITEM': {
+      const item = ITEMS[action.itemId];
+      if (!item) return notify(state, '未知道具！');
+      if (state.player.ryo < item.price) return notify(state, `Ryo 不足！需要 ${item.price} Ryo。`);
+      const existing = state.player.inventory.find(i => i.itemId === action.itemId);
+      const newInventory = existing
+        ? state.player.inventory.map(i => i.itemId === action.itemId ? { ...i, quantity: i.quantity + 1 } : i)
+        : [...state.player.inventory, { itemId: action.itemId, quantity: 1 }];
+      return notify(
+        { ...state, player: { ...state.player, ryo: state.player.ryo - item.price, inventory: newInventory } },
+        `已購買 ${item.name}！`,
+      );
+    }
+
+    case 'USE_ITEM': {
+      const { player: newPlayer, message, success } = applyItemEffect(state.player, action.itemId);
+      const newState = success ? { ...state, player: newPlayer } : state;
+      return notify(newState, message);
+    }
+
+    case 'BATTLE_USE_ITEM': {
+      if (!state.battle) return state;
+      const newBattle = performUseItemInBattle(state.battle, action.itemId);
+      return { ...state, battle: newBattle };
+    }
+
     case 'SAVE_GAME': {
       try {
         localStorage.setItem('ninjalife_save', JSON.stringify({ saveVersion: SAVE_VERSION, player: state.player }));
@@ -346,12 +396,18 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         if (saved) {
           const raw = JSON.parse(saved);
           // Support both new format { saveVersion, player } and legacy format (raw player)
-          const rawPlayer = (raw.saveVersion !== undefined ? raw.player : raw) as PlayerState;
+          const rawPlayer = (raw.saveVersion !== undefined ? raw.player : raw) as PlayerState & { freeRestUsedToday?: boolean };
           // Patch any missing fields added in later save versions
+          const freeRestUsedToday = (rawPlayer as { freeRestUsedToday?: boolean }).freeRestUsedToday ?? false;
+          const { freeRestUsedToday: _removed, ...cleanPlayer } = rawPlayer as typeof rawPlayer & { freeRestUsedToday?: boolean };
+          void _removed;
           const player: PlayerState = {
-            ...rawPlayer,
+            ...cleanPlayer,
             completedQuestIds: rawPlayer.completedQuestIds ?? [],
-            freeRestUsedToday: rawPlayer.freeRestUsedToday ?? false,
+            lastFreeRestDate: rawPlayer.lastFreeRestDate ?? (freeRestUsedToday ? getTodayString() : ''),
+            inventory: rawPlayer.inventory ?? [],
+            activeBuffs: rawPlayer.activeBuffs ?? [],
+            questResetTimestamps: rawPlayer.questResetTimestamps ?? {},
           };
           return notify({ ...state, player, screen: 'HUB', battle: null }, '遊戲已讀取！');
         }

@@ -1,7 +1,22 @@
-import { BLOODLINES, CLINIC_COSTS, EXP_PER_LEVEL, LEVEL_CAP, MD_REGEN_BASE, MODE_CONFIG, SKILLS, SPIN_CONFIG, STAT_POINTS_PER_LEVEL } from './constants';
-import type { BattleState, PlayerState, SkillDefinition } from './types';
+import { BLOODLINES, CLINIC_COSTS, EXP_PER_LEVEL, getLevelCapForRank, ITEMS, MD_REGEN_BASE, MODE_CONFIG, SKILLS, SPIN_CONFIG, STAT_POINTS_PER_LEVEL } from './constants';
+import type { ActiveBuff, BattleState, InventoryItem, PlayerState, QuestDefinition, SkillDefinition } from './types';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+export function getTodayString(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export function isQuestAvailableForPlayer(quest: QuestDefinition, player: PlayerState): boolean {
+  if (quest.repeatType === 'ONCE') {
+    return !player.completedQuestIds.includes(quest.id);
+  }
+  // DAILY
+  const ts = player.questResetTimestamps?.[quest.id];
+  if (!ts) return true;
+  const questDate = new Date(ts).toISOString().slice(0, 10);
+  return questDate !== getTodayString();
+}
 
 function getEquippedMastery(player: PlayerState): number {
   if (!player.equippedBloodlineId) return 0;
@@ -26,6 +41,9 @@ export function calcPlayerAtk(player: PlayerState): number {
   if (player.isInMode) {
     atk *= MODE_CONFIG.atkMultiplier;
   }
+  for (const buff of (player.activeBuffs ?? [])) {
+    if (buff.atkMultiplier) atk *= buff.atkMultiplier;
+  }
   return atk;
 }
 
@@ -38,6 +56,9 @@ export function calcPlayerDef(player: PlayerState): number {
   }
   if (player.isInMode) {
     def *= MODE_CONFIG.defMultiplier;
+  }
+  for (const buff of (player.activeBuffs ?? [])) {
+    if (buff.defMultiplier) def *= buff.defMultiplier;
   }
   return def;
 }
@@ -58,6 +79,9 @@ export function calcPlayerSpd(player: PlayerState): number {
     const mastery = getEquippedMastery(player);
     // +1 bonus SPD per mastery level for SPD bloodlines
     spd += bloodline.passive.spdBonus + Math.max(0, mastery - 1);
+  }
+  for (const buff of (player.activeBuffs ?? [])) {
+    if (buff.spdBonus) spd += buff.spdBonus;
   }
   return spd;
 }
@@ -275,6 +299,12 @@ function advanceToEnemyTurn(state: BattleState): BattleState {
   // Reduce Mode re-activation cooldown
   let s = state.modeCooldown > 0 ? { ...state, modeCooldown: state.modeCooldown - 1 } : state;
 
+  // Decrement active buffs and remove expired ones
+  const updatedBuffs = (s.player.activeBuffs ?? [])
+    .map((b: ActiveBuff) => ({ ...b, remainingTurns: b.remainingTurns - 1 }))
+    .filter((b: ActiveBuff) => b.remainingTurns > 0);
+  s = { ...s, player: { ...s.player, activeBuffs: updatedBuffs } };
+
   // Process mode MD drain
   let newPlayer = { ...s.player };
   if (newPlayer.isInMode) {
@@ -387,7 +417,7 @@ export function performEnemyTurn(state: BattleState): BattleState {
 
 export function checkLevelUp(player: PlayerState): PlayerState {
   let p = { ...player };
-  while (p.stats.level < LEVEL_CAP) {
+  while (p.stats.level < getLevelCapForRank(p.rank)) {
     const needed = EXP_PER_LEVEL(p.stats.level);
     if (p.stats.exp >= needed) {
       p = {
@@ -433,7 +463,7 @@ export function performSpin(player: PlayerState): { player: PlayerState; result:
   }
 
   const rarityBonus = player.rankBonus.spinRarityBonus;
-  const rareIds = ['STORM', 'MIST', 'VOID'];
+  const rareIds = ['STORM', 'MIST', 'VOID', 'SAND', 'LIGHTNING_BL', 'SHADOW', 'KAGUYA'];
   const entries = SPIN_CONFIG.entries.map(e => {
     let weight = e.baseWeight;
     if (rareIds.includes(e.bloodlineId)) {
@@ -479,7 +509,7 @@ export function performSpin(player: PlayerState): { player: PlayerState; result:
 }
 
 export function canRankUp(player: PlayerState): boolean {
-  return player.stats.level >= LEVEL_CAP && player.bossDefeatedThisRank && player.rank !== 'C';
+  return player.stats.level >= getLevelCapForRank(player.rank) && player.bossDefeatedThisRank && player.rank !== 'C';
 }
 
 export function performRankUp(player: PlayerState): PlayerState {
@@ -515,6 +545,7 @@ export function performRankUp(player: PlayerState): PlayerState {
     unlockedMode: false,
     bossDefeatedThisRank: false,
     currentQuestId: null,
+    activeBuffs: [],
   };
 
   // Clamp starting HP to the effective max (e.g. Void reduces max HP).
@@ -552,7 +583,7 @@ export function performRest(
   const maxHp = calcPlayerMaxHp(player);
 
   if (type === 'FREE') {
-    if (player.freeRestUsedToday) {
+    if (player.lastFreeRestDate === getTodayString()) {
       return { player, success: false, message: '今日已使用免費休息！明日再來。' };
     }
     const newHp = Math.min(maxHp, player.stats.hp + Math.floor(maxHp * 0.5));
@@ -561,7 +592,7 @@ export function performRest(
       player: {
         ...player,
         stats: { ...player.stats, hp: newHp, md: newMd },
-        freeRestUsedToday: true,
+        lastFreeRestDate: getTodayString(),
       },
       success: true,
       message: '休息完成！HP 和 Chakra 各回復 50%。',
@@ -582,5 +613,128 @@ export function performRest(
     },
     success: true,
     message: `治療完成！HP 和 Chakra 全回復！（消耗 ${cost} Ryo）`,
+  };
+}
+
+// ── Item helpers ──────────────────────────────────────────────────────────────
+
+function deductInventoryItem(inventory: InventoryItem[], itemId: string): InventoryItem[] {
+  return inventory
+    .map(i => i.itemId === itemId ? { ...i, quantity: i.quantity - 1 } : i)
+    .filter(i => i.quantity > 0);
+}
+
+export function performUseItemInBattle(state: BattleState, itemId: string): BattleState {
+  const invItem = state.player.inventory?.find(i => i.itemId === itemId);
+  if (!invItem || invItem.quantity <= 0) {
+    return { ...state, battleLog: [...state.battleLog, '沒有該道具！'] };
+  }
+
+  const item = ITEMS[itemId];
+  if (!item) {
+    return { ...state, battleLog: [...state.battleLog, '未知道具！'] };
+  }
+
+  let newStats = { ...state.player.stats };
+  let log = `你使用了 ${item.name}！`;
+  const newActiveBuffs = [...(state.player.activeBuffs ?? [])];
+
+  const maxHp = calcPlayerMaxHp(state.player);
+
+  if (item.effect.hpRestore) {
+    const heal = item.effect.hpRestore;
+    newStats = { ...newStats, hp: Math.min(maxHp, newStats.hp + heal) };
+    log += ` 回復 ${heal} HP。`;
+  }
+  if (item.effect.hpRestorePercent) {
+    const heal = Math.floor(maxHp * item.effect.hpRestorePercent);
+    newStats = { ...newStats, hp: Math.min(maxHp, newStats.hp + heal) };
+    log += ` 回復 ${heal} HP。`;
+  }
+  if (item.effect.mdRestore) {
+    const restore = item.effect.mdRestore;
+    newStats = { ...newStats, md: Math.min(newStats.maxMd, newStats.md + restore) };
+    log += ` 回復 ${restore} Chakra。`;
+  }
+  if (item.effect.mdRestorePercent) {
+    const restore = Math.floor(newStats.maxMd * item.effect.mdRestorePercent);
+    newStats = { ...newStats, md: Math.min(newStats.maxMd, newStats.md + restore) };
+    log += ` 回復 ${restore} Chakra。`;
+  }
+  if (item.effect.buffDuration) {
+    const buff: ActiveBuff = {
+      itemId,
+      remainingTurns: item.effect.buffDuration,
+      atkMultiplier: item.effect.atkMultiplier,
+      defMultiplier: item.effect.defMultiplier,
+      spdBonus: item.effect.spdBonus,
+    };
+    newActiveBuffs.push(buff);
+    log += ` 獲得強化效果（${item.effect.buffDuration}回合）。`;
+  }
+
+  const newInventory = deductInventoryItem(state.player.inventory ?? [], itemId);
+  const newPlayer: PlayerState = {
+    ...state.player,
+    stats: newStats,
+    inventory: newInventory,
+    activeBuffs: newActiveBuffs,
+  };
+
+  const newState: BattleState = {
+    ...state,
+    player: newPlayer,
+    battleLog: [...state.battleLog, log],
+  };
+
+  return advanceToEnemyTurn(newState);
+}
+
+export function applyItemEffect(
+  player: PlayerState,
+  itemId: string,
+): { player: PlayerState; message: string; success: boolean } {
+  const invItem = player.inventory?.find(i => i.itemId === itemId);
+  if (!invItem || invItem.quantity <= 0) {
+    return { player, message: '沒有該道具！', success: false };
+  }
+
+  const item = ITEMS[itemId];
+  if (!item || !item.usableOutOfCombat) {
+    return { player, message: '此道具不能在戰鬥外使用！', success: false };
+  }
+
+  let newStats = { ...player.stats };
+  let msg = `你使用了 ${item.name}！`;
+
+  const maxHp = calcPlayerMaxHp(player);
+
+  if (item.effect.hpRestore) {
+    const heal = item.effect.hpRestore;
+    newStats = { ...newStats, hp: Math.min(maxHp, newStats.hp + heal) };
+    msg += ` 回復 ${heal} HP。`;
+  }
+  if (item.effect.hpRestorePercent) {
+    const heal = Math.floor(maxHp * item.effect.hpRestorePercent);
+    newStats = { ...newStats, hp: Math.min(maxHp, newStats.hp + heal) };
+    msg += ` 回復 ${heal} HP。`;
+  }
+  if (item.effect.mdRestore) {
+    const restore = item.effect.mdRestore;
+    newStats = { ...newStats, md: Math.min(newStats.maxMd, newStats.md + restore) };
+    msg += ` 回復 ${restore} Chakra。`;
+  }
+  if (item.effect.mdRestorePercent) {
+    const restore = Math.floor(newStats.maxMd * item.effect.mdRestorePercent);
+    newStats = { ...newStats, md: Math.min(newStats.maxMd, newStats.md + restore) };
+    msg += ` 回復 ${restore} Chakra。`;
+  }
+
+  const newInventory = deductInventoryItem(player.inventory ?? [], itemId);
+
+  return {
+    player: { ...player, stats: newStats, inventory: newInventory },
+    message: msg,
+    success: true,
   };
 }
