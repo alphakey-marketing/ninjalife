@@ -91,6 +91,7 @@ const initialPlayer: PlayerState = {
   lastStaminaRecovery: Date.now(),
   ownedGearIds: [],
   equippedGear: { weapon: null, armor: null, accessory: null },
+  skillMasteries: {},
 };
 
 const initialState: GameState = {
@@ -113,7 +114,7 @@ function autoSave(player: PlayerState): void {
 function createBattle(player: PlayerState, questId: string): BattleState {
   const quest = QUESTS.find(q => q.id === questId)!;
   const enemyDef = ENEMIES[quest.targetEnemyId];
-  const battleLog: string[] = [`A wild ${enemyDef.name} appears!`];
+  const battleLog: string[] = [`${enemyDef.name} が現れた！`];
   let initialPlayer = { ...player };
 
   // SPD initiative: enemy with significantly higher SPD gets a free pre-emptive strike
@@ -122,20 +123,20 @@ function createBattle(player: PlayerState, questId: string): BattleState {
     // Pre-emptive can't kill the player outright
     const newHp = Math.max(1, player.stats.hp - preDamage);
     initialPlayer = { ...player, stats: { ...player.stats, hp: newHp } };
-    battleLog.push(`⚡ ${enemyDef.name} is faster! Pre-emptive strike for ${preDamage} damage!`);
+    battleLog.push(`⚡ ${enemyDef.name} の先制攻撃！ ${preDamage} ダメージ！`);
   }
 
   // Announce enemy abilities
   if (enemyDef.specialAbility === 'CHARGE') {
-    battleLog.push(`⚠ ${enemyDef.name} may charge up powerful attacks!`);
+    battleLog.push(`⚠ ${enemyDef.name} は蓄力攻撃を使う！`);
   } else if (enemyDef.specialAbility === 'GUARD') {
-    battleLog.push(`⚠ ${enemyDef.name} may guard against your strikes!`);
+    battleLog.push(`⚠ ${enemyDef.name} はガードを使う！`);
   } else if (enemyDef.specialAbility === 'HEAL') {
-    battleLog.push(`⚠ ${enemyDef.name} may heal when low on HP!`);
+    battleLog.push(`⚠ ${enemyDef.name} は瀕死になると回復する！`);
   } else if (enemyDef.specialAbility === 'MULTI_HIT') {
-    battleLog.push(`⚠ ${enemyDef.name} may strike multiple times!`);
+    battleLog.push(`⚠ ${enemyDef.name} は連続攻撃を使う！`);
   } else if (enemyDef.specialAbility === 'DEBUFF') {
-    battleLog.push(`⚠ ${enemyDef.name} may debuff your attack!`);
+    battleLog.push(`⚠ ${enemyDef.name} はデバフ攻撃を使う！`);
   }
 
   return {
@@ -481,6 +482,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             lastStaminaRecovery: rawPlayer.lastStaminaRecovery ?? Date.now(),
             ownedGearIds: rawPlayer.ownedGearIds ?? [],
             equippedGear: rawPlayer.equippedGear ?? { weapon: null, armor: null, accessory: null },
+            skillMasteries: rawPlayer.skillMasteries ?? {},
           };
           return notify({ ...state, player, screen: 'HUB', battle: null }, '遊戲已讀取！');
         }
@@ -557,6 +559,7 @@ function tryAutoLoadState(): GameState {
       lastStaminaRecovery: rawPlayer.lastStaminaRecovery ?? Date.now(),
       ownedGearIds: rawPlayer.ownedGearIds ?? [],
       equippedGear: rawPlayer.equippedGear ?? { weapon: null, armor: null, accessory: null },
+      skillMasteries: rawPlayer.skillMasteries ?? {},
     };
     return { screen: 'HUB', player, battle: null, notifications: [] };
   } catch {

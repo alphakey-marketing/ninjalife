@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   applyItemEffect,
   calcDamage,
+  calcElementalMultiplier,
   calcEnemyDamage,
   calcMdRegen,
   calcPlayerAtk,
@@ -13,11 +14,14 @@ import {
   enemyHasFirstStrike,
   equipBloodline,
   getTodayString,
+  getEffectiveSkill,
+  getSkillMasteryLevel,
   hasCritBonus,
   isQuestAvailableForPlayer,
   performAttack,
   performRankUp,
   performRest,
+  performSkill,
 } from '../gameLogic';
 import type { BattleState, PlayerState, QuestDefinition } from '../types';
 import { CLINIC_COSTS, EXP_PER_LEVEL, MD_REGEN_BASE, QUESTS } from '../constants';
@@ -48,6 +52,7 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     lastStaminaRecovery: Date.now(),
     ownedGearIds: [],
     equippedGear: { weapon: null, armor: null, accessory: null },
+    skillMasteries: {},
     ...overrides,
   };
 }
@@ -810,5 +815,103 @@ describe('gear stats with scroll buff and Mode — no explosion', () => {
     });
     // base 100 + 60 = 160
     expect(calcPlayerMaxHp(player)).toBe(160);
+  });
+});
+
+// ── calcElementalMultiplier ───────────────────────────────────────────────────
+
+describe('calcElementalMultiplier', () => {
+  it('returns 1.5 when player element beats enemy element', () => {
+    // FIRE beats WIND
+    expect(calcElementalMultiplier('FIRE', 'WIND')).toBe(1.5);
+  });
+
+  it('returns 0.75 when enemy element beats player element', () => {
+    // WATER beats FIRE, so FIRE attacking WATER gets 0.75×
+    expect(calcElementalMultiplier('FIRE', 'WATER')).toBe(0.75);
+  });
+
+  it('returns 1.0 for neutral matchup', () => {
+    expect(calcElementalMultiplier('FIRE', 'EARTH')).toBe(1.0);
+    expect(calcElementalMultiplier('FIRE', 'LIGHTNING')).toBe(1.0);
+  });
+
+  it('returns 1.0 when either element is undefined', () => {
+    expect(calcElementalMultiplier(undefined, 'FIRE')).toBe(1.0);
+    expect(calcElementalMultiplier('FIRE', undefined)).toBe(1.0);
+    expect(calcElementalMultiplier(undefined, undefined)).toBe(1.0);
+  });
+
+  it('covers all 5 weakness pairs', () => {
+    expect(calcElementalMultiplier('WIND', 'LIGHTNING')).toBe(1.5);
+    expect(calcElementalMultiplier('LIGHTNING', 'EARTH')).toBe(1.5);
+    expect(calcElementalMultiplier('EARTH', 'WATER')).toBe(1.5);
+    expect(calcElementalMultiplier('WATER', 'FIRE')).toBe(1.5);
+  });
+});
+
+// ── getSkillMasteryLevel ──────────────────────────────────────────────────────
+
+describe('getSkillMasteryLevel', () => {
+  it('returns 1 for uses < 20', () => {
+    expect(getSkillMasteryLevel(0)).toBe(1);
+    expect(getSkillMasteryLevel(19)).toBe(1);
+  });
+
+  it('returns 2 for uses 20–59', () => {
+    expect(getSkillMasteryLevel(20)).toBe(2);
+    expect(getSkillMasteryLevel(59)).toBe(2);
+  });
+
+  it('returns 3 for uses >= 60', () => {
+    expect(getSkillMasteryLevel(60)).toBe(3);
+    expect(getSkillMasteryLevel(100)).toBe(3);
+  });
+});
+
+// ── getEffectiveSkill ─────────────────────────────────────────────────────────
+
+describe('getEffectiveSkill', () => {
+  it('returns base skill at mastery level 1', () => {
+    const skill = getEffectiveSkill('BLAZE_SHOT', 1);
+    expect(skill.name).toBe('火遁・豪火球之術');
+  });
+
+  it('returns kai variant at mastery level 2', () => {
+    const skill = getEffectiveSkill('BLAZE_SHOT', 2);
+    expect(skill.name).toContain('改');
+    expect(skill.effects.burnDuration).toBe(5);
+  });
+
+  it('returns ougi variant at mastery level 3', () => {
+    const skill = getEffectiveSkill('BLAZE_SHOT', 3);
+    expect(skill.name).not.toContain('改');
+    expect(skill.effects.damageMultiplier).toBeGreaterThan(2);
+  });
+
+  it('returns base skill when no tiers defined', () => {
+    // MAGNETIC_ARROW has no tiers in SKILL_TIERS, returns base
+    const skill = getEffectiveSkill('MAGNETIC_ARROW', 2);
+    expect(skill.id).toBe('MAGNETIC_ARROW');
+  });
+});
+
+// ── skill mastery increments in combat ───────────────────────────────────────
+
+describe('skill mastery increments on use', () => {
+  it('increments skillMasteries counter on performSkill', () => {
+    const battle = makeBattle({ skillMasteries: {} });
+    const result = performSkill(battle, 'BLAZE_SHOT');
+    expect(result.player.skillMasteries['BLAZE_SHOT']).toBe(1);
+  });
+
+  it('increments mastery across multiple uses', () => {
+    let b = makeBattle({ skillMasteries: { 'BLAZE_SHOT': 18 }, stats: { level: 5, exp: 0, hp: 100, maxHp: 100, atk: 10, def: 5, spd: 5, md: 100, maxMd: 100 } });
+    b = performSkill(b, 'BLAZE_SHOT');
+    // Reset cooldown for next use
+    b = { ...b, skillCooldowns: [], phase: 'PLAYER_TURN' as const };
+    b = performSkill(b, 'BLAZE_SHOT');
+    expect(b.player.skillMasteries['BLAZE_SHOT']).toBe(20);
+    expect(getSkillMasteryLevel(20)).toBe(2);
   });
 });

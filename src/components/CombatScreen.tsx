@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGame } from '../gameStore';
 import { BLOODLINES, ITEMS, QUESTS, SKILLS } from '../constants';
-import { calcPlayerMaxHp } from '../gameLogic';
+import { calcPlayerMaxHp, getSkillMasteryLevel, getEffectiveSkill } from '../gameLogic';
+
+const ELEMENT_EMOJI: Record<string, string> = {
+  FIRE: '🔥', WATER: '💧', LIGHTNING: '⚡', EARTH: '🌍', WIND: '🌀',
+};
 
 export function CombatScreen() {
   const { state, dispatch } = useGame();
@@ -42,7 +46,7 @@ export function CombatScreen() {
   }, [battle?.battleLog]);
 
   if (!battle) {
-    return <div className="screen"><div className="card">No active battle.</div></div>;
+    return <div className="screen"><div className="card">戦闘がありません。</div></div>;
   }
 
   const { player, enemy } = battle;
@@ -65,7 +69,7 @@ export function CombatScreen() {
       <div className="header-bar">
         <span className="text-gold">{quest.name}</span>
         <span className="text-small text-gray">
-          {battle.enemiesDefeated}/{quest.targetCount} defeated | Turn {battle.turnNumber}
+          {battle.enemiesDefeated}/{quest.targetCount} 撃破 | ターン {battle.turnNumber}
         </span>
       </div>
 
@@ -119,6 +123,7 @@ export function CombatScreen() {
           <div style={{ textAlign: 'right' }} className={enemyHit ? 'combat-hit-flash' : ''}>
             <div className="text-bold" style={{ marginBottom: '6px' }}>
               {enemy.definition.name}
+              {enemy.definition.element && <span className="text-small"> {ELEMENT_EMOJI[enemy.definition.element]}</span>}
               {enemy.statusEffects.find(e => e.type === 'BURN') && <span className="text-red"> 🔥</span>}
               {enemy.isGuarding && <span className="text-blue"> 🛡</span>}
               {enemy.chargeReady && <span className="text-gold"> ⚡</span>}
@@ -146,10 +151,10 @@ export function CombatScreen() {
       {/* Actions */}
       {!isVictory && !isDefeat && (
         <div className="card">
-          <div className="card-title">Actions</div>
+          <div className="card-title">行動</div>
           <div className="combat-actions">
             <button className="btn btn-primary" disabled={!canAct} onClick={() => dispatch({ type: 'BATTLE_ATTACK' })}>
-              ⚔ Attack
+              ⚔ 攻撃
             </button>
             <button
               className="btn"
@@ -164,28 +169,32 @@ export function CombatScreen() {
             </button>
             {availableSkills.map(skill => {
               const cd = battle.skillCooldowns.find(c => c.skillId === skill.id);
+              const skillMastery = player.skillMasteries?.[skill.id] ?? 0;
+              const masteryLevel = getSkillMasteryLevel(skillMastery);
+              const effectiveSkill = getEffectiveSkill(skill.id, masteryLevel);
+              const tierLabel = masteryLevel === 3 ? ' [奥義]' : masteryLevel === 2 ? ' [改]' : '';
               const onCd = cd && cd.remainingTurns > 0;
-              const noMd = player.stats.md < skill.mdCost;
-              const noHp = player.stats.hp <= skill.hpCost;
+              const noMd = player.stats.md < effectiveSkill.mdCost;
+              const noHp = player.stats.hp <= effectiveSkill.hpCost;
               const tooLowLevel = player.stats.level < skill.requiredLevel;
               return (
                 <button
                   key={skill.id}
-                  className={`btn${activeSkillId === skill.id ? ' skill-active' : ''}`}
+                  className={`btn${activeSkillId === skill.id ? ' skill-active' : ''}${masteryLevel === 3 ? ' skill-ougi' : ''}`}
                   disabled={!canAct || !!onCd || noMd || noHp || tooLowLevel}
                   onClick={() => {
                     setActiveSkillId(skill.id);
                     setTimeout(() => setActiveSkillId(null), 600);
                     dispatch({ type: 'BATTLE_SKILL', skillId: skill.id });
                   }}
-                  title={skill.description}
+                  title={effectiveSkill.description}
                 >
-                  ✨ {skill.name}
+                  ✨ {effectiveSkill.name}{tierLabel}
                   {tooLowLevel
                     ? ` (LV${skill.requiredLevel})`
                     : onCd
                       ? ` (${cd!.remainingTurns}t)`
-                      : ` (${skill.mdCost}Chakra${skill.hpCost > 0 ? `+${skill.hpCost}HP` : ''})`}
+                      : ` (${effectiveSkill.mdCost}Chakra${effectiveSkill.hpCost > 0 ? `+${effectiveSkill.hpCost}HP` : ''})`}
                 </button>
               );
             })}

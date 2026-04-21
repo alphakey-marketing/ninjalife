@@ -1,4 +1,4 @@
-import { BLOODLINES, CLINIC_COSTS, EXP_PER_LEVEL, GEAR, getLevelCapForRank, ITEMS, MAX_STAMINA, MD_REGEN_BASE, MODE_CONFIG, RARE_BLOODLINE_IDS, SKILLS, SPIN_CONFIG, STAT_POINTS_PER_LEVEL } from './constants';
+import { BLOODLINES, CLINIC_COSTS, EXP_PER_LEVEL, GEAR, getLevelCapForRank, ITEMS, MAX_STAMINA, MD_REGEN_BASE, MODE_CONFIG, RARE_BLOODLINE_IDS, SKILL_TIERS, SKILLS, SPIN_CONFIG, STAT_POINTS_PER_LEVEL } from './constants';
 import type { ActiveBuff, BattleState, InventoryItem, PlayerState, QuestDefinition, SkillDefinition } from './types';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -126,6 +126,59 @@ export function calcDamage(atk: number, enemyDef: number): number {
   return Math.max(1, Math.floor(atk * 1.0 - enemyDef * 0.5));
 }
 
+// FIRE → WIND → LIGHTNING → EARTH → WATER → FIRE (arrow means "beats")
+const BEATS: Record<string, string> = {
+  FIRE: 'WIND',
+  WIND: 'LIGHTNING',
+  LIGHTNING: 'EARTH',
+  EARTH: 'WATER',
+  WATER: 'FIRE',
+};
+
+export function calcElementalMultiplier(playerElement: string | undefined, enemyElement: string | undefined): number {
+  if (!playerElement || !enemyElement) return 1.0;
+  if (BEATS[playerElement] === enemyElement) return 1.5;   // player beats enemy → enemy is weak
+  if (BEATS[enemyElement] === playerElement) return 0.75;  // enemy beats player → enemy resists
+  return 1.0;
+}
+
+export function getSkillMasteryLevel(useCount: number): 1 | 2 | 3 {
+  if (useCount >= 60) return 3;
+  if (useCount >= 20) return 2;
+  return 1;
+}
+
+export function getEffectiveSkill(skillId: string, masteryLevel: 1 | 2 | 3): SkillDefinition {
+  const base = SKILLS[skillId];
+  if (!base) return base;
+  const tiers = SKILL_TIERS[skillId];
+  if (!tiers) return base;
+
+  if (masteryLevel === 3 && tiers.ougi) {
+    return {
+      ...base,
+      name: tiers.ougi.name,
+      description: tiers.ougi.description,
+      effects: tiers.ougi.effects,
+      mdCost: tiers.ougi.mdCost ?? base.mdCost,
+      hpCost: tiers.ougi.hpCost ?? base.hpCost,
+      cooldownTurn: tiers.ougi.cooldownTurn ?? base.cooldownTurn,
+    };
+  }
+  if (masteryLevel >= 2 && tiers.kai) {
+    return {
+      ...base,
+      name: tiers.kai.name,
+      description: tiers.kai.description,
+      effects: tiers.kai.effects,
+      mdCost: tiers.kai.mdCost ?? base.mdCost,
+      hpCost: tiers.kai.hpCost ?? base.hpCost,
+      cooldownTurn: tiers.kai.cooldownTurn ?? base.cooldownTurn,
+    };
+  }
+  return base;
+}
+
 export function calcEnemyDamage(enemyAtk: number, def: number): number {
   return Math.max(1, Math.floor(enemyAtk * 1.0 - def * 0.5));
 }
@@ -155,8 +208,15 @@ export function performAttack(state: BattleState): BattleState {
   const effectiveAtk = atkDownEffect ? atk * (1 - (atkDownEffect.atkDebuffPercent ?? 0)) : atk;
   const critChance = hasCritBonus(state.player);
   const isCrit = Math.random() < critChance;
+
+  const equippedBloodline = state.player.equippedBloodlineId ? BLOODLINES[state.player.equippedBloodlineId] : null;
+  const playerElement = equippedBloodline?.element;
+  const enemyElement = state.enemy.definition.element;
+  const elementMultiplier = calcElementalMultiplier(playerElement, enemyElement);
+
   let damage = calcDamage(effectiveAtk, state.enemy.definition.stats.def);
   if (isCrit) damage = Math.floor(damage * 1.5);
+  damage = Math.floor(damage * elementMultiplier);
 
   // Enemy guard halves incoming damage
   if (state.enemy.isGuarding) {
@@ -164,10 +224,13 @@ export function performAttack(state: BattleState): BattleState {
   }
 
   const newEnemyHp = Math.max(0, state.enemy.currentHp - damage);
-  const guardNote = state.enemy.isGuarding ? ' (Guarded!)' : '';
-  const log = isCrit
-    ? `You land a CRITICAL HIT for ${damage} damage!${guardNote}`
-    : `You attack for ${damage} damage.${guardNote}`;
+  const guardNote = state.enemy.isGuarding ? '（ガード！）' : '';
+  let log = isCrit
+    ? `クリティカルヒット！ ${damage} のダメージ！${guardNote}`
+    : `あなたは ${damage} のダメージを与えた。${guardNote}`;
+
+  if (elementMultiplier > 1) log += ' 🔥 弱点！ ×1.5';
+  else if (elementMultiplier < 1) log += ' 💧 耐性… ×0.75';
 
   const newState: BattleState = {
     ...state,
@@ -185,14 +248,14 @@ export function performAttack(state: BattleState): BattleState {
 export function performSkill(state: BattleState, skillId: string): BattleState {
   if (state.phase !== 'PLAYER_TURN') return state;
 
-  const skill: SkillDefinition = SKILLS[skillId];
-  if (!skill) return state;
+  const baseSkill: SkillDefinition = SKILLS[skillId];
+  if (!baseSkill) return state;
 
   // Check level requirement
-  if (state.player.stats.level < skill.requiredLevel) {
+  if (state.player.stats.level < baseSkill.requiredLevel) {
     return {
       ...state,
-      battleLog: [...state.battleLog, `Requires Level ${skill.requiredLevel} to use ${skill.name}!`],
+      battleLog: [...state.battleLog, `${baseSkill.name} を使用するにはLV${baseSkill.requiredLevel}が必要です！`],
     };
   }
 
@@ -201,22 +264,33 @@ export function performSkill(state: BattleState, skillId: string): BattleState {
   if (cdEntry && cdEntry.remainingTurns > 0) {
     return {
       ...state,
-      battleLog: [...state.battleLog, `${skill.name} is on cooldown for ${cdEntry.remainingTurns} more turn(s).`],
+      battleLog: [...state.battleLog, `${baseSkill.name} はクールダウン中です（残り${cdEntry.remainingTurns}ターン）。`],
     };
   }
 
+  // Get mastery-adjusted skill
+  const masteryCount = state.player.skillMasteries?.[skillId] ?? 0;
+  const masteryLevel = getSkillMasteryLevel(masteryCount);
+  const skill = getEffectiveSkill(skillId, masteryLevel);
+
   // Check costs
   if (state.player.stats.hp <= skill.hpCost) {
-    return { ...state, battleLog: [...state.battleLog, `Not enough HP to use ${skill.name}!`] };
+    return { ...state, battleLog: [...state.battleLog, `${skill.name} を使用するにはHPが不足しています！`] };
   }
   if (state.player.stats.md < skill.mdCost) {
-    return { ...state, battleLog: [...state.battleLog, `Not enough MD to use ${skill.name}!`] };
+    return { ...state, battleLog: [...state.battleLog, `${skill.name} を使用するにはチャクラが不足しています！`] };
   }
 
   const atk = calcPlayerAtk(state.player);
   const atkDownEffect = (state.playerStatusEffects ?? []).find(e => e.type === 'ATK_DOWN');
   const effectiveAtk = atkDownEffect ? atk * (1 - (atkDownEffect.atkDebuffPercent ?? 0)) : atk;
   const damageMultiplier = skill.effects.damageMultiplier ?? 1.0;
+
+  // Elemental multiplier
+  const equippedBloodline = state.player.equippedBloodlineId ? BLOODLINES[state.player.equippedBloodlineId] : null;
+  const playerElement = equippedBloodline?.element;
+  const enemyElement = state.enemy.definition.element;
+  const elementMultiplier = calcElementalMultiplier(playerElement, enemyElement);
 
   // Deduct costs first
   let newPlayerStats = {
@@ -225,21 +299,43 @@ export function performSkill(state: BattleState, skillId: string): BattleState {
     md: state.player.stats.md - skill.mdCost,
   };
 
-  let skillLog = `You use ${skill.name}!`;
+  let skillLog = `${skill.name} を発動！`;
   let newEnemyHp = state.enemy.currentHp;
   const newEnemyStatusEffects = [...state.enemy.statusEffects];
   let newIsGuarding = state.enemy.isGuarding;
+  let skipEnemyNextTurn = false;
 
   // Deal damage (damageMultiplier > 0 means an offensive skill)
   if (damageMultiplier > 0) {
-    let damage = Math.max(1, Math.floor(calcDamage(effectiveAtk, state.enemy.definition.stats.def) * damageMultiplier));
+    let damage: number;
+    if (skill.effects.ignoreDefense) {
+      // ignoreDefense: bypass enemy def
+      damage = Math.max(1, Math.floor(effectiveAtk * damageMultiplier));
+    } else {
+      damage = Math.max(1, Math.floor(calcDamage(effectiveAtk, state.enemy.definition.stats.def) * damageMultiplier));
+    }
+
+    // Multi-hit: multiply damage by hit count
+    if (skill.effects.multiHitCount) {
+      damage *= skill.effects.multiHitCount;
+      skillLog += ` (${skill.effects.multiHitCount}連撃！)`;
+    }
+
+    // Apply elemental multiplier
+    damage = Math.floor(damage * elementMultiplier);
+
     // Enemy guard halves incoming damage
     if (state.enemy.isGuarding) {
       damage = Math.floor(damage * 0.5);
       newIsGuarding = false;
     }
-    skillLog = `You use ${skill.name} for ${damage} damage!`;
-    if (state.enemy.isGuarding) skillLog += ' (Guarded!)';
+
+    skillLog = `${skill.name}！ ${damage} のダメージ！`;
+    if (skill.effects.multiHitCount) skillLog += ` (${skill.effects.multiHitCount}連撃！)`;
+    if (state.enemy.isGuarding) skillLog += '（ガード！）';
+    if (elementMultiplier > 1) skillLog += ' 🔥 弱点！ ×1.5';
+    else if (elementMultiplier < 1) skillLog += ' 💧 耐性… ×0.75';
+
     newEnemyHp = Math.max(0, state.enemy.currentHp - damage);
 
     // Apply burn
@@ -249,7 +345,13 @@ export function performSkill(state: BattleState, skillId: string): BattleState {
         damagePerTurn: skill.effects.burnDamagePerTurn ?? 5,
         remainingTurns: skill.effects.burnDuration ?? 3,
       });
-      skillLog += ' Enemy is BURNING!';
+      skillLog += ' 敵に炎上付与！';
+    }
+
+    // skipEnemyTurn
+    if (skill.effects.skipEnemyTurn) {
+      skipEnemyNextTurn = true;
+      skillLog += ' 敵は行動不能！';
     }
   }
 
@@ -257,25 +359,46 @@ export function performSkill(state: BattleState, skillId: string): BattleState {
   if (skill.effects.healSelfPercent) {
     const healAmount = Math.floor(calcPlayerMaxHp(state.player) * skill.effects.healSelfPercent);
     newPlayerStats = { ...newPlayerStats, hp: Math.min(calcPlayerMaxHp(state.player), newPlayerStats.hp + healAmount) };
-    skillLog += ` Healed ${healAmount} HP.`;
+    skillLog += ` ${healAmount} HP回復！`;
   }
 
   // MD restore
   if (skill.effects.mdRestore) {
     newPlayerStats = { ...newPlayerStats, md: Math.min(newPlayerStats.maxMd, newPlayerStats.md + skill.effects.mdRestore) };
-    skillLog += ` Restored ${skill.effects.mdRestore} MD.`;
+    skillLog += ` チャクラ${skill.effects.mdRestore}回復！`;
   }
 
   // Set cooldown
   const newCooldowns = state.skillCooldowns.filter(c => c.skillId !== skillId);
   newCooldowns.push({ skillId, remainingTurns: skill.cooldownTurn });
 
+  // Increment skill mastery
+  const newSkillMasteries = { ...(state.player.skillMasteries ?? {}) };
+  newSkillMasteries[skillId] = (newSkillMasteries[skillId] ?? 0) + 1;
+  const newMasteryCount = newSkillMasteries[skillId];
+  const prevLevel = getSkillMasteryLevel(newMasteryCount - 1);
+  const newLevel = getSkillMasteryLevel(newMasteryCount);
+  let masteryLog = '';
+  if (newLevel > prevLevel) {
+    if (newLevel === 2) masteryLog = `⚡ ${baseSkill.name} が改に進化した！`;
+    if (newLevel === 3) masteryLog = `⚡ ${baseSkill.name} が奥義に達した！`;
+  }
+
+  const logEntries = [skillLog];
+  if (masteryLog) logEntries.push(masteryLog);
+
   const newState: BattleState = {
     ...state,
-    player: { ...state.player, stats: newPlayerStats },
-    enemy: { ...state.enemy, currentHp: newEnemyHp, statusEffects: newEnemyStatusEffects, isGuarding: newIsGuarding },
+    player: { ...state.player, stats: newPlayerStats, skillMasteries: newSkillMasteries },
+    enemy: {
+      ...state.enemy,
+      currentHp: newEnemyHp,
+      statusEffects: newEnemyStatusEffects,
+      isGuarding: newIsGuarding,
+      isSkippingTurn: skipEnemyNextTurn ? true : state.enemy.isSkippingTurn,
+    },
     skillCooldowns: newCooldowns,
-    battleLog: [...state.battleLog, skillLog],
+    battleLog: [...state.battleLog, ...logEntries],
   };
 
   if (newEnemyHp <= 0) {
@@ -375,6 +498,34 @@ export function performEnemyTurn(state: BattleState): BattleState {
   let newEnemy = { ...state.enemy };
   let newPlayerStatusEffects = [...(state.playerStatusEffects ?? [])];
 
+  // Handle skip turn (from skipEnemyTurn skills)
+  if (newEnemy.isSkippingTurn) {
+    newLog.push(`${newEnemy.definition.name} は行動不能！`);
+    // Reduce skill cooldowns
+    const newCooldowns = state.skillCooldowns.map(c => ({
+      ...c,
+      remainingTurns: Math.max(0, c.remainingTurns - 1),
+    }));
+    // MD regen
+    if (!newPlayer.isInMode) {
+      const mdRegen = calcMdRegen(newPlayer);
+      newPlayer = {
+        ...newPlayer,
+        stats: { ...newPlayer.stats, md: Math.min(newPlayer.stats.maxMd, newPlayer.stats.md + mdRegen) },
+      };
+    }
+    return {
+      ...state,
+      player: newPlayer,
+      enemy: { ...newEnemy, isSkippingTurn: false },
+      battleLog: newLog,
+      skillCooldowns: newCooldowns,
+      playerStatusEffects: newPlayerStatusEffects,
+      phase: 'PLAYER_TURN',
+      turnNumber: state.turnNumber + 1,
+    };
+  }
+
   // Process burn on enemy
   const burnEffect = newEnemy.statusEffects.find(e => e.type === 'BURN');
   if (burnEffect) {
@@ -386,7 +537,7 @@ export function performEnemyTurn(state: BattleState): BattleState {
         .map(e => e.type === 'BURN' ? { ...e, remainingTurns: e.remainingTurns - 1 } : e)
         .filter(e => e.remainingTurns > 0),
     };
-    newLog.push(`Enemy burns for ${burnDmg} damage!`);
+    newLog.push(`敵は ${burnDmg} の炎上ダメージ！`);
     if (newEnemy.currentHp <= 0) {
       return { ...state, enemy: newEnemy, battleLog: newLog, phase: 'VICTORY', playerStatusEffects: newPlayerStatusEffects };
     }
@@ -401,14 +552,14 @@ export function performEnemyTurn(state: BattleState): BattleState {
     const def = calcPlayerDef(newPlayer);
     const damage = calcEnemyDamage(enemyDef.stats.atk * 2, def);
     const newHp = Math.max(0, newPlayer.stats.hp - damage);
-    newLog.push(`⚡ ${enemyDef.name} unleashes a CHARGED attack for ${damage} damage!`);
+    newLog.push(`⚡ ${enemyDef.name} の蓄力攻撃！ ${damage} の巨大ダメージ！`);
     newPlayer = { ...newPlayer, stats: { ...newPlayer.stats, hp: newHp } };
   } else if (enemyDef.specialAbility === 'GUARD' && Math.random() < (enemyDef.specialAbilityChance ?? 0)) {
     nextIsGuarding = true;
-    newLog.push(`🛡 ${enemyDef.name} braces for impact! (Guard active)`);
+    newLog.push(`🛡 ${enemyDef.name} は守りを固めた！`);
   } else if (enemyDef.specialAbility === 'CHARGE' && Math.random() < (enemyDef.specialAbilityChance ?? 0)) {
     nextChargeReady = true;
-    newLog.push(`⚡ ${enemyDef.name} is charging up a powerful attack!`);
+    newLog.push(`⚡ ${enemyDef.name} は力を蓄えている！`);
   } else if (enemyDef.specialAbility === 'HEAL') {
     if (newEnemy.currentHp < enemyDef.stats.maxHp * 0.4 && Math.random() < (enemyDef.specialAbilityChance ?? 0)) {
       const healAmt = Math.floor(enemyDef.stats.maxHp * 0.2);
@@ -419,7 +570,7 @@ export function performEnemyTurn(state: BattleState): BattleState {
     const def = calcPlayerDef(newPlayer);
     const damage = calcEnemyDamage(enemyDef.stats.atk, def);
     const newHp = Math.max(0, newPlayer.stats.hp - damage);
-    newLog.push(`${enemyDef.name} attacks you for ${damage} damage.`);
+    newLog.push(`${enemyDef.name} の攻撃！ ${damage} のダメージ！`);
     newPlayer = { ...newPlayer, stats: { ...newPlayer.stats, hp: newHp } };
   } else if (enemyDef.specialAbility === 'MULTI_HIT' && Math.random() < (enemyDef.specialAbilityChance ?? 0)) {
     const def = calcPlayerDef(newPlayer);
@@ -440,14 +591,14 @@ export function performEnemyTurn(state: BattleState): BattleState {
     const def = calcPlayerDef(newPlayer);
     const damage = calcEnemyDamage(enemyDef.stats.atk, def);
     const newHp = Math.max(0, newPlayer.stats.hp - damage);
-    newLog.push(`💜 ${enemyDef.name} 施展封印術！你的攻擊力下降 20%！（2 回合）`);
-    newLog.push(`${enemyDef.name} attacks you for ${damage} damage.`);
+    newLog.push(`💜 ${enemyDef.name} の封印術！攻撃力が20%低下！（2ターン）`);
+    newLog.push(`${enemyDef.name} の攻撃！ ${damage} のダメージ！`);
     newPlayer = { ...newPlayer, stats: { ...newPlayer.stats, hp: newHp } };
   } else {
     const def = calcPlayerDef(newPlayer);
     const damage = calcEnemyDamage(enemyDef.stats.atk, def);
     const newHp = Math.max(0, newPlayer.stats.hp - damage);
-    newLog.push(`${enemyDef.name} attacks you for ${damage} damage.`);
+    newLog.push(`${enemyDef.name} の攻撃！ ${damage} のダメージ！`);
     newPlayer = { ...newPlayer, stats: { ...newPlayer.stats, hp: newHp } };
   }
 

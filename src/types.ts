@@ -1,4 +1,5 @@
 export type Rarity = 'COMMON' | 'RARE' | 'LEGENDARY';
+export type Element = 'FIRE' | 'WATER' | 'LIGHTNING' | 'EARTH' | 'WIND';
 export type QuestType = 'GRIND' | 'ELITE' | 'BOSS';
 export type Rank = 'E' | 'D' | 'C';
 export type ActionType = 'ATTACK' | 'SKILL' | 'TOGGLE_MODE' | 'RUN';
@@ -109,6 +110,7 @@ export interface PlayerState {
   lastStaminaRecovery: number;
   ownedGearIds: string[];
   equippedGear: EquippedGear;
+  skillMasteries: Record<string, number>;
 }
 
 export interface SkillEffectNumbers {
@@ -120,6 +122,11 @@ export interface SkillEffectNumbers {
   burnDuration?: number;
   healSelfPercent?: number;
   mdRestore?: number;
+  ignoreDefense?: boolean;
+  skipEnemyTurn?: boolean;
+  multiHitCount?: number;
+  reflectDamagePercent?: number;
+  spdDebuff?: boolean;
 }
 
 export interface SkillDefinition {
@@ -138,6 +145,7 @@ export interface BloodlineDefinition {
   name: string;
   rarity: Rarity;
   description: string;
+  element?: Element;
   passive: {
     atkMultiplier?: number;
     hpMultiplier?: number;
@@ -200,6 +208,7 @@ export interface EnemyDefinition {
   name: string;
   description: string;
   stats: EnemyStats;
+  element?: Element;
   specialAbility?: 'GUARD' | 'CHARGE' | 'HEAL' | 'MULTI_HIT' | 'DEBUFF';
   specialAbilityChance?: number;
 }
@@ -221,10 +230,11 @@ export interface SkillCooldownState {
 }
 
 export interface StatusEffect {
-  type: 'BURN' | 'ATK_DOWN';
+  type: 'BURN' | 'ATK_DOWN' | 'SPD_DOWN';
   damagePerTurn?: number;
   remainingTurns: number;
   atkDebuffPercent?: number;
+  spdDebuffAmount?: number;
 }
 
 export interface BattleState {
@@ -235,6 +245,7 @@ export interface BattleState {
     statusEffects: StatusEffect[];
     isGuarding: boolean;
     chargeReady: boolean;
+    isSkippingTurn?: boolean;
   };
   skillCooldowns: SkillCooldownState[];
   turnNumber: number;

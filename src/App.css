@@ -442,3 +442,11 @@ body {
 .spin-flash-common { animation: spinFlashCommon 1.5s ease; }
 .spin-flash-rare { animation: spinFlashRare 1.5s ease; }
 .spin-flash-legendary { animation: spinFlashLegendary 1.5s ease; }
+
+.skill-ougi {
+  border-color: #f0a030;
+  box-shadow: 0 0 8px rgba(240, 160, 48, 0.5);
+}
+.skill-ougi:not(:disabled) {
+  background: linear-gradient(135deg, #1a0a00, #2a1800);
+}

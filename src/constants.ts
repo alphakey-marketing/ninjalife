@@ -1,11 +1,12 @@
-import type { BloodlineDefinition, EnemyDefinition, GearDefinition, ItemDefinition, ModeConfig, QuestDefinition, RankDefinition, Rank, SkillDefinition, SpinConfig } from './types';
+import type { BloodlineDefinition, EnemyDefinition, GearDefinition, ItemDefinition, ModeConfig, QuestDefinition, RankDefinition, Rank, SkillDefinition, SpinConfig, SkillEffectNumbers } from './types';
 
 // Save version history:
 // 1 → 2: Added completedQuestIds, freeRestUsedToday
 // 2 → 3: Added inventory, activeBuffs, questResetTimestamps; migrated freeRestUsedToday → lastFreeRestDate (YYYY-MM-DD)
 // 3 → 4: Added stamina/maxStamina, staminaCost on quests, playerStatusEffects in battle
 // 4 → 5: Added gear system (ownedGearIds, equippedGear), lastStaminaRecovery
-export const SAVE_VERSION = 5;
+// 5 → 6: Added skillMasteries on player; element on bloodlines/enemies
+export const SAVE_VERSION = 6;
 export const MD_REGEN_BASE = 5;
 export const MAX_STAMINA = 100;
 export const STAMINA_REST_FREE = 50;
@@ -162,6 +163,37 @@ export const SKILLS: Record<string, SkillDefinition> = {
     requiredLevel: 15,
     effects: { damageMultiplier: 2.8 },
   },
+  // ── Advanced nature exclusive skills ────────────────────────────────────────
+  MAGNETIC_ARROW: {
+    id: 'MAGNETIC_ARROW',
+    name: '磁遁・砂鐵の矢',
+    description: '磁遁血繼限界の奥義。砂鉄の矢を放ち、防御を無視して貫通する。',
+    hpCost: 0,
+    mdCost: 35,
+    cooldownTurn: 5,
+    requiredLevel: 20,
+    effects: { damageMultiplier: 2.4, ignoreDefense: true },
+  },
+  SHADOW_STITCH: {
+    id: 'SHADOW_STITCH',
+    name: '影縫い術・奥義',
+    description: '奈良一族の極意。影で敵を縫い付け、次の行動を封じる。',
+    hpCost: 0,
+    mdCost: 30,
+    cooldownTurn: 5,
+    requiredLevel: 20,
+    effects: { damageMultiplier: 1.6, skipEnemyTurn: true },
+  },
+  BONE_THOUSAND: {
+    id: 'BONE_THOUSAND',
+    name: '骨槍・千本桜',
+    description: '輝夜一族の奥義。骨を千の槍に変え、3回連続で攻撃する。',
+    hpCost: 30,
+    mdCost: 40,
+    cooldownTurn: 6,
+    requiredLevel: 25,
+    effects: { damageMultiplier: 1.0, multiHitCount: 3 },
+  },
 };
 
 export const BLOODLINES: Record<string, BloodlineDefinition> = {
@@ -170,6 +202,7 @@ export const BLOODLINES: Record<string, BloodlineDefinition> = {
     name: '不知火一族（火遁）',
     rarity: 'COMMON',
     description: '擁有強大火遁血統，天生攻擊力提升。',
+    element: 'FIRE',
     passive: { atkMultiplier: 1.1 },
     skillIds: ['BLAZE_SHOT'],
   },
@@ -178,6 +211,7 @@ export const BLOODLINES: Record<string, BloodlineDefinition> = {
     name: '日向一族（白眼）',
     rarity: 'RARE',
     description: '白眼洞察一切弱點，提升暴擊機率。',
+    element: 'LIGHTNING',
     passive: { critChanceBonus: 0.1 },
     skillIds: ['THUNDER_STRIKE'],
   },
@@ -186,6 +220,7 @@ export const BLOODLINES: Record<string, BloodlineDefinition> = {
     name: '宇智波一族（寫輪眼）',
     rarity: 'LEGENDARY',
     description: '寫輪眼賦予極致力量，但以生命力為代價。',
+    element: 'FIRE',
     passive: { atkMultiplier: 1.4, hpMultiplier: 0.8 },
     skillIds: ['VOID_SLASH'],
   },
@@ -194,6 +229,7 @@ export const BLOODLINES: Record<string, BloodlineDefinition> = {
     name: '山中一族（鐵壁防禦）',
     rarity: 'COMMON',
     description: '山中一族的堅韌血脈，提供卓越防禦能力。',
+    element: 'EARTH',
     passive: { defMultiplier: 1.25 },
     skillIds: ['IRON_GUARD'],
   },
@@ -202,6 +238,7 @@ export const BLOODLINES: Record<string, BloodlineDefinition> = {
     name: '霧隱一族（霧步）',
     rarity: 'RARE',
     description: '霧隱忍者的血統，速度與 Chakra 回復俱佳。',
+    element: 'WATER',
     passive: { spdBonus: 2, mdRegenBonus: 5 },
     skillIds: ['MIST_STEP'],
   },
@@ -210,6 +247,7 @@ export const BLOODLINES: Record<string, BloodlineDefinition> = {
     name: '水之國族（水遁）',
     rarity: 'COMMON',
     description: '水之國的血統，查克拉回復能力優異。',
+    element: 'WATER',
     passive: { mdRegenBonus: 8 },
     skillIds: ['WATER_DRAGON'],
   },
@@ -218,14 +256,16 @@ export const BLOODLINES: Record<string, BloodlineDefinition> = {
     name: '砂之國族（防禦）',
     rarity: 'RARE',
     description: '砂隱村的防禦血統，鐵壁之守護。',
+    element: 'EARTH',
     passive: { defMultiplier: 1.3, spdBonus: 1 },
-    skillIds: ['SAND_ARMOR'],
+    skillIds: ['SAND_ARMOR', 'MAGNETIC_ARROW'],
   },
   LIGHTNING_BL: {
     id: 'LIGHTNING_BL',
     name: '雲之村族（雷遁）',
     rarity: 'RARE',
     description: '雲隱村的雷遁血統，攻擊力與暴擊俱佳。',
+    element: 'LIGHTNING',
     passive: { atkMultiplier: 1.2, critChanceBonus: 0.05 },
     skillIds: ['LIGHTNING_CLONE'],
   },
@@ -234,6 +274,7 @@ export const BLOODLINES: Record<string, BloodlineDefinition> = {
     name: '岩之村族（土遁）',
     rarity: 'COMMON',
     description: '岩隱村的土遁血統，生命力強韌。',
+    element: 'EARTH',
     passive: { hpMultiplier: 1.2 },
     skillIds: ['EARTH_SPIKE'],
   },
@@ -242,6 +283,7 @@ export const BLOODLINES: Record<string, BloodlineDefinition> = {
     name: '風之國族（風遁）',
     rarity: 'COMMON',
     description: '風之國的風遁血統，速度超群。',
+    element: 'WIND',
     passive: { spdBonus: 3 },
     skillIds: ['WIND_SLASH'],
   },
@@ -250,16 +292,18 @@ export const BLOODLINES: Record<string, BloodlineDefinition> = {
     name: '奈良一族（影術）',
     rarity: 'RARE',
     description: '奈良一族的影術血統，智謀與攻擊兼備。',
+    element: 'LIGHTNING',
     passive: { atkMultiplier: 1.15, critChanceBonus: 0.08 },
-    skillIds: ['SHADOW_BIND'],
+    skillIds: ['SHADOW_BIND', 'SHADOW_STITCH'],
   },
   KAGUYA: {
     id: 'KAGUYA',
     name: '輝夜一族（屍骨脈）',
     rarity: 'LEGENDARY',
     description: '輝夜一族的屍骨脈血統，以骨骼為武器，攻擊力強大但以生命力為代價。',
+    element: 'WATER',
     passive: { atkMultiplier: 1.45, hpMultiplier: 0.85 },
-    skillIds: ['BONE_LANCE'],
+    skillIds: ['BONE_LANCE', 'BONE_THOUSAND'],
   },
 };
 
@@ -302,6 +346,7 @@ export const ENEMIES: Record<string, EnemyDefinition> = {
     name: '追蹤忍犬',
     description: '木葉村的追蹤忍犬，速度迅猛。',
     stats: { maxHp: 70, atk: 9, def: 3, spd: 6 },
+    element: 'EARTH',
     specialAbility: 'MULTI_HIT',
     specialAbilityChance: 0.30,
   },
@@ -310,6 +355,7 @@ export const ENEMIES: Record<string, EnemyDefinition> = {
     name: '音忍刺客',
     description: '大蛇丸麾下的音忍刺客，善於蓄力猛攻。',
     stats: { maxHp: 100, atk: 14, def: 4, spd: 3 },
+    element: 'LIGHTNING',
     specialAbility: 'CHARGE',
     specialAbilityChance: 0.25,
   },
@@ -318,6 +364,7 @@ export const ENEMIES: Record<string, EnemyDefinition> = {
     name: '暗部隊員',
     description: '木葉暗部的精銳成員，實力深不可測。',
     stats: { maxHp: 140, atk: 17, def: 6, spd: 7 },
+    element: 'FIRE',
     specialAbility: 'DEBUFF',
     specialAbilityChance: 0.25,
   },
@@ -326,12 +373,14 @@ export const ENEMIES: Record<string, EnemyDefinition> = {
     name: '巨型土熊',
     description: '受土遁術加持的巨型熊，攻擊力驚人。',
     stats: { maxHp: 200, atk: 20, def: 9, spd: 2 },
+    element: 'EARTH',
   },
   TEMPLE_MONK: {
     id: 'TEMPLE_MONK',
     name: '砂忍精英',
     description: '風之國砂隱村的精英忍者，善於防禦。',
     stats: { maxHp: 160, atk: 22, def: 10, spd: 6 },
+    element: 'WATER',
     specialAbility: 'HEAL',
     specialAbilityChance: 0.30,
   },
@@ -340,6 +389,7 @@ export const ENEMIES: Record<string, EnemyDefinition> = {
     name: '四尾人柱力',
     description: '四尾（孫悟空）的人柱力，擁有壓倒性的力量。',
     stats: { maxHp: 350, atk: 28, def: 12, spd: 8 },
+    element: 'FIRE',
     specialAbility: 'GUARD',
     specialAbilityChance: 0.25,
   },
@@ -348,12 +398,14 @@ export const ENEMIES: Record<string, EnemyDefinition> = {
     name: '上忍老兵',
     description: '經驗豐富的上忍，實戰能力極強。',
     stats: { maxHp: 320, atk: 34, def: 14, spd: 9 },
+    element: 'EARTH',
   },
   SAND_PUPPETEER: {
     id: 'SAND_PUPPETEER',
     name: '砂之傀儡師',
     description: '風之國的傀儡操控師，善於防禦反擊。',
     stats: { maxHp: 270, atk: 30, def: 22, spd: 6 },
+    element: 'WIND',
     specialAbility: 'GUARD',
     specialAbilityChance: 0.35,
   },
@@ -362,6 +414,7 @@ export const ENEMIES: Record<string, EnemyDefinition> = {
     name: '叛忍',
     description: '脫離村莊的危險叛忍，實力強大且不擇手段。',
     stats: { maxHp: 400, atk: 40, def: 16, spd: 11 },
+    element: 'LIGHTNING',
     specialAbility: 'DEBUFF',
     specialAbilityChance: 0.25,
   },
@@ -370,6 +423,7 @@ export const ENEMIES: Record<string, EnemyDefinition> = {
     name: '暁成員',
     description: '神秘組織「暁」的成員，強大到令人絕望。',
     stats: { maxHp: 550, atk: 52, def: 20, spd: 13 },
+    element: 'FIRE',
     specialAbility: 'GUARD',
     specialAbilityChance: 0.2,
   },
@@ -378,12 +432,14 @@ export const ENEMIES: Record<string, EnemyDefinition> = {
     name: '暗部隊長',
     description: '木葉暗部的精英隊長，身手矯捷且攻守兼備。',
     stats: { maxHp: 500, atk: 48, def: 26, spd: 14 },
+    element: 'FIRE',
   },
   LEGENDARY_NINJA: {
     id: 'LEGENDARY_NINJA',
     name: '傳說忍者',
     description: '名留青史的傳說忍者，速度與力量無人能及。',
     stats: { maxHp: 450, atk: 55, def: 20, spd: 19 },
+    element: 'WIND',
     specialAbility: 'MULTI_HIT',
     specialAbilityChance: 0.35,
   },
@@ -392,6 +448,7 @@ export const ENEMIES: Record<string, EnemyDefinition> = {
     name: '咒印使用者',
     description: '被大蛇丸賦予咒印之力的忍者，蓄力攻擊極為致命。',
     stats: { maxHp: 600, atk: 60, def: 22, spd: 16 },
+    element: 'LIGHTNING',
     specialAbility: 'CHARGE',
     specialAbilityChance: 0.30,
   },
@@ -400,6 +457,7 @@ export const ENEMIES: Record<string, EnemyDefinition> = {
     name: '天道・六道仙人',
     description: '佩恩的天道之體，掌握萬引力之術，幾乎無法抵禦。',
     stats: { maxHp: 900, atk: 70, def: 32, spd: 20 },
+    element: 'WATER',
     specialAbility: 'GUARD',
     specialAbilityChance: 0.25,
   },
@@ -779,3 +837,169 @@ export const GEAR_SHOP_IDS: string[] = [
   'TRAINING_ROBE', 'ANBU_ARMOR', 'SAGE_COAT',
   'CHAKRA_BEAD', 'SPEED_SEAL', 'LIFE_CHARM',
 ];
+
+export interface SkillTierDefinition {
+  name: string;
+  description: string;
+  effects: SkillEffectNumbers;
+  mdCost?: number;
+  hpCost?: number;
+  cooldownTurn?: number;
+}
+
+export const SKILL_TIERS: Record<string, { kai?: SkillTierDefinition; ougi?: SkillTierDefinition }> = {
+  BLAZE_SHOT: {
+    kai: {
+      name: '火遁・豪火球 改',
+      description: '改良版豪火球の術。炎の持続時間が延長される。',
+      effects: { damageMultiplier: 1.5, burnChance: 0.4, burnDamagePerTurn: 5, burnDuration: 5 },
+    },
+    ougi: {
+      name: '火遁・真空波',
+      description: '奥義：爆炎の波動を放ち、圧倒的な火属性ダメージを与える。',
+      effects: { damageMultiplier: 2.8, burnChance: 0.6, burnDamagePerTurn: 8, burnDuration: 4 },
+    },
+  },
+  THUNDER_STRIKE: {
+    kai: {
+      name: '雷切流',
+      description: '雷切の改良型。速度低下効果が付与される。',
+      effects: { damageMultiplier: 2.5, spdDebuff: true },
+    },
+    ougi: {
+      name: '紫電',
+      description: '奥義：紫の稲妻で敵を貫き、麻痺を与える。',
+      effects: { damageMultiplier: 3.5, skipEnemyTurn: true },
+      mdCost: 40,
+    },
+  },
+  VOID_SLASH: {
+    kai: {
+      name: '天照 改',
+      description: '天照の改良型。HP消費が軽減される。',
+      effects: { damageMultiplier: 3.0 },
+      hpCost: 10,
+      mdCost: 20,
+    },
+    ougi: {
+      name: '須佐能乎',
+      description: '奥義：完全体須佐能乎を発動。次の敵の攻撃を30%反射する。',
+      effects: { damageMultiplier: 4.0, reflectDamagePercent: 0.3 },
+      hpCost: 25,
+      mdCost: 30,
+    },
+  },
+  IRON_GUARD: {
+    kai: {
+      name: '八卦六十四掌・改',
+      description: '改良版八卦掌。回復量が増加する。',
+      effects: { damageMultiplier: 0, healSelfPercent: 0.25 },
+    },
+    ougi: {
+      name: '八卦空掌',
+      description: '奥義：次の敵の攻撃を完全に反射する。',
+      effects: { damageMultiplier: 0, healSelfPercent: 0.25, reflectDamagePercent: 0.5 },
+    },
+  },
+  MIST_STEP: {
+    kai: {
+      name: '水遁・霧隠し 改',
+      description: '改良版霧隠し。Chakra回復量が増加する。',
+      effects: { damageMultiplier: 1.4, mdRestore: 30 },
+    },
+    ougi: {
+      name: '幻霧殺',
+      description: '奥義：霧の幻惑で敵の次の行動を封じる。',
+      effects: { damageMultiplier: 2.0, mdRestore: 20, skipEnemyTurn: true },
+    },
+  },
+  WATER_DRAGON: {
+    kai: {
+      name: '水遁・水龍弾 改',
+      description: '水龍の力が増大し、より多くのダメージを与える。',
+      effects: { damageMultiplier: 2.5 },
+    },
+    ougi: {
+      name: '水遁・大爆流',
+      description: '奥義：巨大な水流で敵を押し流す。',
+      effects: { damageMultiplier: 3.5 },
+    },
+  },
+  SAND_ARMOR: {
+    kai: {
+      name: '砂瀑防護盾 改',
+      description: '改良版砂防護。回復量が増加する。',
+      effects: { damageMultiplier: 0, healSelfPercent: 0.35 },
+    },
+    ougi: {
+      name: '絶対防御',
+      description: '奥義：砂で完全に身を包み、次のダメージを50%軽減しつつ回復する。',
+      effects: { damageMultiplier: 0, healSelfPercent: 0.4, reflectDamagePercent: 0.2 },
+    },
+  },
+  LIGHTNING_CLONE: {
+    kai: {
+      name: '雷遁・影分身 改',
+      description: '分身の雷力が増強。燃焼確率が上昇する。',
+      effects: { damageMultiplier: 2.2, burnChance: 0.45, burnDamagePerTurn: 8, burnDuration: 3 },
+    },
+    ougi: {
+      name: '雷神の術',
+      description: '奥義：雷の化身となり、圧倒的な電撃を放つ。',
+      effects: { damageMultiplier: 3.2, burnChance: 0.6, burnDamagePerTurn: 10, burnDuration: 4 },
+    },
+  },
+  EARTH_SPIKE: {
+    kai: {
+      name: '土遁・土流壁 改',
+      description: '改良版土流壁。より強力な衝撃を与える。',
+      effects: { damageMultiplier: 2.8 },
+    },
+    ougi: {
+      name: '土遁・岩石激流',
+      description: '奥義：大地を操り岩石の津波を起こす。',
+      effects: { damageMultiplier: 3.8 },
+      mdCost: 40,
+    },
+  },
+  WIND_SLASH: {
+    kai: {
+      name: '風遁・風刃術 改',
+      description: '改良版風刃術。切れ味が増し、ダメージが向上する。',
+      effects: { damageMultiplier: 2.0 },
+    },
+    ougi: {
+      name: '風遁・真空波',
+      description: '奥義：真空の刃で敵を切り裂く。',
+      effects: { damageMultiplier: 3.0 },
+    },
+  },
+  SHADOW_BIND: {
+    kai: {
+      name: '影縫い術 改',
+      description: '影縫いの精度が上昇。Chakra吸収量が増える。',
+      effects: { damageMultiplier: 1.8, mdRestore: 25 },
+    },
+    ougi: {
+      name: '影真似の術・完全体',
+      description: '奥義：完全な影模倣で敵を完全拘束する。',
+      effects: { damageMultiplier: 2.4, mdRestore: 20, skipEnemyTurn: true },
+    },
+  },
+  BONE_LANCE: {
+    kai: {
+      name: '屍骨脈・骨矛 改',
+      description: '骨矛の貫通力が向上する。HP消費が軽減される。',
+      effects: { damageMultiplier: 2.8 },
+      hpCost: 12,
+      mdCost: 25,
+    },
+    ougi: {
+      name: '屍骨脈・舞',
+      description: '奥義：屍骨脈の究極奥義。骨を全身から放出し圧倒的ダメージを与える。',
+      effects: { damageMultiplier: 4.0 },
+      hpCost: 20,
+      mdCost: 35,
+    },
+  },
+};
