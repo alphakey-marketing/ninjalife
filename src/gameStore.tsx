@@ -467,8 +467,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           const raw = JSON.parse(saved);
           // Support both new format { saveVersion, player } and legacy format (raw player)
           const rawPlayer = (raw.saveVersion !== undefined ? raw.player : raw) as PlayerState & { freeRestUsedToday?: boolean };
-          // Patch any missing fields added in later save versions
-          const freeRestUsedToday = rawPlayer.freeRestUsedToday ?? false;
           // Build clean player without deprecated freeRestUsedToday field
           const { freeRestUsedToday: _deprecated, ...cleanPlayer } = rawPlayer;
           const player: PlayerState = {
@@ -484,7 +482,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             ownedGearIds: rawPlayer.ownedGearIds ?? [],
             equippedGear: rawPlayer.equippedGear ?? { weapon: null, armor: null, accessory: null },
           };
-          void freeRestUsedToday; // only used via _deprecated above
           return notify({ ...state, player, screen: 'HUB', battle: null }, '遊戲已讀取！');
         }
         return notify(state, '找不到存檔！');
@@ -587,7 +584,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const interval = setInterval(() => dispatch({ type: 'STAMINA_TICK' }), 60_000);
     return () => clearInterval(interval);
-  }, []);
+  }, [dispatch]);
 
   return (
     <GameContext.Provider value={{ state, dispatch }}>

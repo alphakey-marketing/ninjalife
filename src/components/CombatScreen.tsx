@@ -19,23 +19,20 @@ export function CombatScreen() {
     const prevPlayerHp = prevPlayerHpRef.current;
     const prevEnemyHp = prevEnemyHpRef.current;
 
+    // Update refs before setting animation state to avoid stale comparisons
+    prevPlayerHpRef.current = battle.player.stats.hp;
+    prevEnemyHpRef.current = battle.enemy.currentHp;
+
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
     if (prevPlayerHp !== null && battle.player.stats.hp < prevPlayerHp) {
       setPlayerHit(true);
-      const t = setTimeout(() => setPlayerHit(false), 500);
-      prevPlayerHpRef.current = battle.player.stats.hp;
-      prevEnemyHpRef.current = battle.enemy.currentHp;
-      return () => clearTimeout(t);
+      timeouts.push(setTimeout(() => setPlayerHit(false), 500));
     }
     if (prevEnemyHp !== null && battle.enemy.currentHp < prevEnemyHp) {
       setEnemyHit(true);
-      const t = setTimeout(() => setEnemyHit(false), 500);
-      prevPlayerHpRef.current = battle.player.stats.hp;
-      prevEnemyHpRef.current = battle.enemy.currentHp;
-      return () => clearTimeout(t);
+      timeouts.push(setTimeout(() => setEnemyHit(false), 500));
     }
-
-    prevPlayerHpRef.current = battle.player.stats.hp;
-    prevEnemyHpRef.current = battle.enemy.currentHp;
+    return () => timeouts.forEach(t => clearTimeout(t));
   }, [battle?.player.stats.hp, battle?.enemy.currentHp]);
 
   useEffect(() => {
