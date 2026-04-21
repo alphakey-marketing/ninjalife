@@ -83,6 +83,7 @@ export function StatusScreen() {
             <div className={`rarity-${equipped.rarity.toLowerCase()} text-bold`}>
               {equipped.name} [{equipped.rarity}]
               {equipped.element && <span> {ELEMENT_EMOJI[equipped.element]}</span>}
+              {equipped.advancedNature && <span className="text-small text-gray"> 〈{equipped.advancedNature}〉</span>}
               {equippedMastery > 1 && <span className="text-gold"> ★{equippedMastery}</span>}
             </div>
             <div className="text-small text-gray" style={{ marginTop: '4px' }}>{equipped.description}</div>
@@ -121,7 +122,7 @@ export function StatusScreen() {
             const masteryLevel = getSkillMasteryLevel(skillMastery);
             const effectiveSkill = getEffectiveSkill(skill.id, masteryLevel);
             const tierLabel = masteryLevel === 3 ? ' [奥義]' : masteryLevel === 2 ? ' [改]' : '';
-            const nextThreshold = masteryLevel === 1 ? 20 : masteryLevel === 2 ? 60 : 60;
+            const nextThreshold = masteryLevel === 1 ? 20 : masteryLevel === 2 ? 60 : 100;
             const masteryPct = Math.min(100, (skillMastery / nextThreshold) * 100);
             return (
               <div key={skill.id} style={{ marginBottom: '10px', padding: '8px', border: `1px solid ${masteryLevel === 3 ? '#f0a030' : masteryLevel === 2 ? '#4488ff' : '#2a2a3a'}`, borderRadius: '4px' }}>

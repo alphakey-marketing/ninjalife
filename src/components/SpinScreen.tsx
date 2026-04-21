@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useGame } from '../gameStore';
-import { BLOODLINES, RARE_BLOODLINE_IDS, SPIN_CONFIG } from '../constants';
+import { BLOODLINES, ELEMENT_EMOJI, RARE_BLOODLINE_IDS, SPIN_CONFIG } from '../constants';
 
 const rarityEmoji: Record<string, string> = {
   COMMON: '◆',
@@ -100,6 +100,7 @@ export function SpinScreen() {
         <div className={`spin-wheel-display ${showResultFlash ? `spin-flash-${displayBl.rarity.toLowerCase()}` : ''}`}>
           <div className={`rarity-${displayBl.rarity.toLowerCase()} text-bold`} style={{ fontSize: '1.3rem' }}>
             {rarityEmoji[displayBl.rarity]} {displayBl.name}
+            {displayBl.element && <span> {ELEMENT_EMOJI[displayBl.element]}</span>}
           </div>
           <div className="text-small text-gray" style={{ marginTop: '4px' }}>[{displayBl.rarity}]</div>
         </div>
@@ -115,6 +116,7 @@ export function SpinScreen() {
               <div key={entry.bloodlineId} className="stat-row text-small">
                 <span className={`rarity-${bl.rarity.toLowerCase()}`}>
                   {rarityEmoji[bl.rarity]} {bl.name}
+                  {bl.element && <span> {ELEMENT_EMOJI[bl.element]}</span>}
                 </span>
                 <span className="text-gray">{(effectiveWeight / totalWeight * 100).toFixed(1)}%</span>
               </div>
@@ -157,6 +159,7 @@ export function SpinScreen() {
                 <div>
                   <div className={`rarity-${bl.rarity.toLowerCase()}`}>
                     {rarityEmoji[bl.rarity]} {bl.name}
+                    {bl.element && <span> {ELEMENT_EMOJI[bl.element]}</span>}
                     <span className="text-small text-gray"> [{bl.rarity}]</span>
                   </div>
                   <div className="text-small text-gray" style={{ marginTop: '2px' }}>{bl.description}</div>

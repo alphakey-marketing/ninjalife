@@ -315,38 +315,42 @@ export function performSkill(state: BattleState, skillId: string): BattleState {
       damage = Math.max(1, Math.floor(calcDamage(effectiveAtk, state.enemy.definition.stats.def) * damageMultiplier));
     }
 
-    // Multi-hit: multiply damage by hit count
-    if (skill.effects.multiHitCount) {
-      damage *= skill.effects.multiHitCount;
-      skillLog += ` (${skill.effects.multiHitCount}連撃！)`;
-    }
-
-    // Apply elemental multiplier
+    // Apply elemental multiplier to per-hit damage
     damage = Math.floor(damage * elementMultiplier);
 
-    // Enemy guard halves incoming damage
-    if (state.enemy.isGuarding) {
-      damage = Math.floor(damage * 0.5);
-      newIsGuarding = false;
+    // Multi-hit: loop each strike individually so guard/burn apply per hit
+    const hitCount = skill.effects.multiHitCount ?? 1;
+    let totalDamage = 0;
+    let guardHit = false;
+    for (let i = 0; i < hitCount; i++) {
+      let hitDmg = damage;
+      // Guard only absorbs the first hit then drops
+      if (i === 0 && state.enemy.isGuarding) {
+        hitDmg = Math.floor(hitDmg * 0.5);
+        newIsGuarding = false;
+        guardHit = true;
+      }
+      totalDamage += hitDmg;
+      // Burn proc per hit (cap at one application)
+      if (skill.effects.burnChance && Math.random() < skill.effects.burnChance) {
+        if (!newEnemyStatusEffects.some(e => e.type === 'BURN')) {
+          newEnemyStatusEffects.push({
+            type: 'BURN',
+            damagePerTurn: skill.effects.burnDamagePerTurn ?? 5,
+            remainingTurns: skill.effects.burnDuration ?? 3,
+          });
+          skillLog += ' 敵に炎上付与！';
+        }
+      }
     }
 
-    skillLog = `${skill.name}！ ${damage} のダメージ！`;
-    if (skill.effects.multiHitCount) skillLog += ` (${skill.effects.multiHitCount}連撃！)`;
-    if (state.enemy.isGuarding) skillLog += '（ガード！）';
+    skillLog = `${skill.name}！ ${totalDamage} のダメージ！`;
+    if (hitCount > 1) skillLog += ` (${hitCount}連撃！)`;
+    if (guardHit) skillLog += '（ガード！）';
     if (elementMultiplier > 1) skillLog += ' 🔥 弱点！ ×1.5';
     else if (elementMultiplier < 1) skillLog += ' 💧 耐性… ×0.75';
 
-    newEnemyHp = Math.max(0, state.enemy.currentHp - damage);
-
-    // Apply burn
-    if (skill.effects.burnChance && Math.random() < skill.effects.burnChance) {
-      newEnemyStatusEffects.push({
-        type: 'BURN',
-        damagePerTurn: skill.effects.burnDamagePerTurn ?? 5,
-        remainingTurns: skill.effects.burnDuration ?? 3,
-      });
-      skillLog += ' 敵に炎上付与！';
-    }
+    newEnemyHp = Math.max(0, state.enemy.currentHp - totalDamage);
 
     // skipEnemyTurn
     if (skill.effects.skipEnemyTurn) {

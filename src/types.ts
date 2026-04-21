@@ -146,6 +146,7 @@ export interface BloodlineDefinition {
   rarity: Rarity;
   description: string;
   element?: Element;
+  advancedNature?: string;
   passive: {
     atkMultiplier?: number;
     hpMultiplier?: number;

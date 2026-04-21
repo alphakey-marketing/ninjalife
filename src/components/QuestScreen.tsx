@@ -1,5 +1,5 @@
 import { useGame } from '../gameStore';
-import { ENEMIES, QUEST_ZONES, QUESTS } from '../constants';
+import { ELEMENT_EMOJI, ENEMIES, QUEST_ZONES, QUESTS } from '../constants';
 import { getTodayString } from '../gameLogic';
 
 const questTypeLabel: Record<string, string> = {
@@ -60,6 +60,7 @@ export function QuestScreen() {
                   <div className="flex-row text-small" style={{ marginTop: '6px', justifyContent: 'space-between' }}>
                     <span>
                       擊敗 {quest.targetCount}× {enemyDef?.name ?? quest.targetEnemyId}
+                      {enemyDef?.element && <span> {ELEMENT_EMOJI[enemyDef.element]}</span>}
                       {enemyDef?.specialAbility === 'GUARD' && <span className="text-gray"> 🛡</span>}
                       {enemyDef?.specialAbility === 'CHARGE' && <span className="text-gray"> ⚡</span>}
                       {enemyDef?.specialAbility === 'HEAL' && <span className="text-green"> 💚</span>}
