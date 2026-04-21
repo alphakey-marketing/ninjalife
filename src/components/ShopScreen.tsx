@@ -16,14 +16,14 @@ export function ShopScreen() {
   return (
     <div className="screen">
       <div className="header-bar">
-        <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'HUB' })}>← 返回</button>
-        <span className="game-title" style={{ fontSize: '1.1rem' }}>🛒 忍具商店</span>
+        <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'HUB' })}>← 戻る</button>
+        <span className="game-title" style={{ fontSize: '1.1rem' }}>🛒 <ruby>忍具<rt>にんぐ</rt></ruby><ruby>商店<rt>しょうてん</rt></ruby></span>
         <span className="text-gold">💰 {player.ryo} Ryo</span>
       </div>
 
       {/* Shop items */}
       <div className="card">
-        <div className="card-title">🏪 商品列表</div>
+        <div className="card-title">🏪 <ruby>商品<rt>しょうひん</rt></ruby><ruby>一覧<rt>いちらん</rt></ruby></div>
         {itemList.map(item => (
           <div key={item.id} className="shop-item item-entry">
             <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -32,8 +32,8 @@ export function ShopScreen() {
                   {typeEmoji[item.type]} {item.name}
                 </div>
                 <div className="text-small text-gray">{item.description}</div>
-                {item.usableInCombat && <span className="text-small text-blue"> ⚔ 戰鬥中可用</span>}
-                {item.usableOutOfCombat && <span className="text-small text-green"> 🏠 場外可用</span>}
+                {item.usableInCombat && <span className="text-small text-blue"> ⚔ <ruby>戦闘<rt>せんとう</rt></ruby>中<ruby>使用<rt>しよう</rt></ruby>可</span>}
+                {item.usableOutOfCombat && <span className="text-small text-green"> 🏠 <ruby>戦闘外<rt>せんとうがい</rt></ruby><ruby>使用<rt>しよう</rt></ruby>可</span>}
               </div>
               <div style={{ textAlign: 'right', minWidth: '100px' }}>
                 <div className="text-gold">{item.price} Ryo</div>
@@ -43,7 +43,7 @@ export function ShopScreen() {
                   disabled={player.ryo < item.price}
                   onClick={() => dispatch({ type: 'BUY_ITEM', itemId: item.id })}
                 >
-                  購買
+                  <ruby>購入<rt>こうにゅう</rt></ruby>
                 </button>
               </div>
             </div>
@@ -53,9 +53,9 @@ export function ShopScreen() {
 
       {/* Player inventory */}
       <div className="card">
-        <div className="card-title">🎒 我的道具</div>
+        <div className="card-title">🎒 <ruby>所持<rt>しょじ</rt></ruby><ruby>道具<rt>どうぐ</rt></ruby></div>
         {player.inventory.length === 0 ? (
-          <div className="text-gray text-small">背包是空的。</div>
+          <div className="text-gray text-small"><ruby>道具袋<rt>どうぐぶくろ</rt></ruby>が<ruby>空<rt>から</rt></ruby>です。</div>
         ) : (
           player.inventory.map(inv => {
             const item = ITEMS[inv.itemId];
@@ -74,7 +74,7 @@ export function ShopScreen() {
                       style={{ fontSize: '0.85rem' }}
                       onClick={() => dispatch({ type: 'USE_ITEM', itemId: inv.itemId })}
                     >
-                      使用
+                      <ruby>使用<rt>しよう</rt></ruby>
                     </button>
                   )}
                   <button
@@ -82,7 +82,7 @@ export function ShopScreen() {
                     style={{ fontSize: '0.85rem' }}
                     onClick={() => dispatch({ type: 'SELL_ITEM', itemId: inv.itemId })}
                   >
-                    出售 (+{Math.floor(item.price * 0.5)} Ryo)
+                    <ruby>売却<rt>ばいきゃく</rt></ruby> (+{Math.floor(item.price * 0.5)} Ryo)
                   </button>
                 </div>
               </div>

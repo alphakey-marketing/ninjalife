@@ -82,18 +82,18 @@ export function SpinScreen() {
   return (
     <div className="screen">
       <div className="header-bar">
-        <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'HUB' })}>← 返回</button>
-        <span className="game-title" style={{ fontSize: '1.1rem' }}>🌀 血繼限界轉盤</span>
+        <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'HUB' })}>← 戻る</button>
+        <span className="game-title" style={{ fontSize: '1.1rem' }}>🌀 <ruby>血継限界<rt>けっけいげんかい</rt></ruby>ガチャ</span>
         <span className="text-gold">💰 {player.ryo} Ryo</span>
       </div>
 
       <div className="card">
-        <div className="card-title">轉盤抽取血繼限界</div>
+        <div className="card-title"><ruby>血継限界<rt>けっけいげんかい</rt></ruby>ガチャ</div>
         <div className="text-small text-gray" style={{ marginBottom: '8px' }}>
-          重複抽到已有血繼限界可提升熟練度，每級熟練度提供 +2% 被動技能加成。
+          すでに<ruby>持<rt>も</rt></ruby>っている<ruby>血継限界<rt>けっけいげんかい</rt></ruby>を<ruby>引<rt>ひ</rt></ruby>くと<ruby>熟練度<rt>じゅくれんど</rt></ruby>が<ruby>上<rt>あ</rt></ruby>がる。<ruby>熟練度<rt>じゅくれんど</rt></ruby>1<ruby>段階<rt>だんかい</rt></ruby>ごとに+2%のパッシブスキル<ruby>強化<rt>きょうか</rt></ruby>を<ruby>付与<rt>ふよ</rt></ruby>。
         </div>
         <div className="text-small text-gray" style={{ marginBottom: '12px' }}>
-          費用：{SPIN_CONFIG.priceRyo} Ryo / 次
+          <ruby>費用<rt>ひよう</rt></ruby>：{SPIN_CONFIG.priceRyo} Ryo / <ruby>回<rt>かい</rt></ruby>
         </div>
 
         {/* Roulette Display */}
@@ -107,7 +107,7 @@ export function SpinScreen() {
 
         {/* Odds Display */}
         <div style={{ marginBottom: '12px' }}>
-          <div className="text-small text-gray" style={{ marginBottom: '4px' }}>基礎機率：</div>
+          <div className="text-small text-gray" style={{ marginBottom: '4px' }}><ruby>基本<rt>きほん</rt></ruby><ruby>確率<rt>かくりつ</rt></ruby>：</div>
           {SPIN_CONFIG.entries.map(entry => {
             const bl = BLOODLINES[entry.bloodlineId];
             const rarityBonus = rareIds.includes(entry.bloodlineId) ? player.rankBonus.spinRarityBonus * 100 : 0;
@@ -124,7 +124,7 @@ export function SpinScreen() {
           })}
           {player.rankBonus.spinRarityBonus > 0 && (
             <div className="text-small text-gold" style={{ marginTop: '4px' }}>
-              等級加成：+{player.rankBonus.spinRarityBonus * 100}% RARE/LEGENDARY 機率
+              ランクボーナス：RARE/LEGENDARY<ruby>確率<rt>かくりつ</rt></ruby>+{player.rankBonus.spinRarityBonus * 100}%
             </div>
           )}
         </div>
@@ -135,7 +135,7 @@ export function SpinScreen() {
           disabled={player.ryo < SPIN_CONFIG.priceRyo || isSpinning}
           onClick={handleSpin}
         >
-          {isSpinning ? '🌀 轉動中...' : '🌀 抽取！(100 Ryo)'}
+          {isSpinning ? '�� 回転中（かいてんちゅう）...' : '🌀 ガチャを引く！(100 Ryo)'}
         </button>
 
         {spinResult && !isSpinning && (
@@ -147,9 +147,9 @@ export function SpinScreen() {
 
       {/* Owned Bloodlines */}
       <div className="card">
-        <div className="card-title">你的血繼限界 ({player.ownedBloodlines.length})</div>
+        <div className="card-title"><ruby>所持<rt>しょじ</rt></ruby><ruby>血継限界<rt>けっけいげんかい</rt></ruby> ({player.ownedBloodlines.length})</div>
         {player.ownedBloodlines.length === 0 ? (
-          <div className="text-gray text-small">尚未獲得血繼限界。轉動抽取！</div>
+          <div className="text-gray text-small">まだ<ruby>血継限界<rt>けっけいげんかい</rt></ruby>を<ruby>持<rt>も</rt></ruby>っていません。ガチャを<ruby>引<rt>ひ</rt></ruby>いてください！</div>
         ) : (
           player.ownedBloodlines.map(owned => {
             const bl = BLOODLINES[owned.id];
@@ -164,9 +164,9 @@ export function SpinScreen() {
                   </div>
                   <div className="text-small text-gray" style={{ marginTop: '2px' }}>{bl.description}</div>
                   <div className="text-small" style={{ marginTop: '2px' }}>
-                    熟練度: <span className="text-gold">{owned.mastery}</span>
+                    <ruby>熟練度<rt>じゅくれんど</rt></ruby>: <span className="text-gold">{owned.mastery}</span>
                     {owned.mastery > 1 && (
-                      <span className="text-gray"> (+{((owned.mastery - 1) * 2)}% 被動加成)</span>
+                      <span className="text-gray"> (+{((owned.mastery - 1) * 2)}% パッシブ<ruby>強化<rt>きょうか</rt></ruby>)</span>
                     )}
                   </div>
                 </div>
@@ -175,7 +175,7 @@ export function SpinScreen() {
                   onClick={() => dispatch({ type: 'EQUIP_BLOODLINE', bloodlineId: owned.id })}
                   style={{ minWidth: '70px' }}
                 >
-                  {isEquipped ? '✓ 已裝備' : '裝備'}
+                  {isEquipped ? '✓ 装備中' : '装備'}
                 </button>
               </div>
             );

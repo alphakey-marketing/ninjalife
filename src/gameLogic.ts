@@ -568,7 +568,7 @@ export function performEnemyTurn(state: BattleState): BattleState {
     if (newEnemy.currentHp < enemyDef.stats.maxHp * 0.4 && Math.random() < (enemyDef.specialAbilityChance ?? 0)) {
       const healAmt = Math.floor(enemyDef.stats.maxHp * 0.2);
       newEnemy = { ...newEnemy, currentHp: Math.min(enemyDef.stats.maxHp, newEnemy.currentHp + healAmt) };
-      newLog.push(`💚 ${enemyDef.name} 自我恢復了 ${healAmt} HP！`);
+      newLog.push(`💚 ${enemyDef.name} はHPを${healAmt}回復した！`);
     }
     // Always also attack this turn
     const def = calcPlayerDef(newPlayer);
@@ -585,7 +585,7 @@ export function performEnemyTurn(state: BattleState): BattleState {
       totalDmg += dmg;
       currentHp = Math.max(0, currentHp - dmg);
     }
-    newLog.push(`⚡ ${enemyDef.name} 連續攻擊 2 次，共造成 ${totalDmg} 點傷害！`);
+    newLog.push(`⚡ ${enemyDef.name} の連続攻撃！合計${totalDmg}ダメージ！`);
     newPlayer = { ...newPlayer, stats: { ...newPlayer.stats, hp: currentHp } };
   } else if (enemyDef.specialAbility === 'DEBUFF' && Math.random() < (enemyDef.specialAbilityChance ?? 0)) {
     const existing = newPlayerStatusEffects.find(e => e.type === 'ATK_DOWN');
@@ -724,10 +724,10 @@ export function performSpin(player: PlayerState): { player: PlayerState; result:
     newOwnedBloodlines = newOwnedBloodlines.map(b =>
       b.id === chosenId ? { ...b, mastery: b.mastery + 1 } : b
     );
-    resultMsg = `重複！${BLOODLINES[chosenId].name} 熟練度 +1`;
+    resultMsg = `重複！${BLOODLINES[chosenId].name} 熟練度+1`;
   } else {
     newOwnedBloodlines.push({ id: chosenId, mastery: 1 });
-    resultMsg = `新血繼限界：${BLOODLINES[chosenId].name}！`;
+    resultMsg = `新しい血継限界：${BLOODLINES[chosenId].name}！`;
   }
 
   return {
@@ -819,7 +819,7 @@ export function performRest(
 
   if (type === 'FREE') {
     if (player.lastFreeRestDate === getTodayString()) {
-      return { player, success: false, message: '今日已使用免費休息！明日再來。' };
+      return { player, success: false, message: '本日の無料休憩は使用済みです！明日また来てください。' };
     }
     const newHp = Math.min(maxHp, player.stats.hp + Math.floor(maxHp * 0.5));
     const newMd = Math.min(player.stats.maxMd, player.stats.md + Math.floor(player.stats.maxMd * 0.5));
@@ -830,7 +830,7 @@ export function performRest(
         lastFreeRestDate: getTodayString(),
       },
       success: true,
-      message: '休息完成！HP 和 Chakra 各回復 50%。精力請使用精力丹回復。',
+      message: '休憩完了！HPとChakraがそれぞれ50%回復しました。スタミナはスタミナ丸で回復してください。',
     };
   }
 
@@ -838,7 +838,7 @@ export function performRest(
   const bracket = CLINIC_COSTS.find(b => player.stats.level <= b.maxLevel) ?? CLINIC_COSTS[CLINIC_COSTS.length - 1];
   const cost = bracket.cost;
   if (player.ryo < cost) {
-    return { player, success: false, message: `Ryo 不足！需要 ${cost} Ryo。` };
+    return { player, success: false, message: `Ryoが不足しています！必要: ${cost} Ryo。` };
   }
   return {
     player: {
@@ -847,7 +847,7 @@ export function performRest(
       ryo: player.ryo - cost,
     },
     success: true,
-    message: `治療完成！HP 和 Chakra 全回復！（消耗 ${cost} Ryo）`,
+    message: `治療完了！HPとChakraが全回復しました！（${cost} Ryo消費）`,
   };
 }
 
@@ -862,16 +862,16 @@ function deductInventoryItem(inventory: InventoryItem[], itemId: string): Invent
 export function performUseItemInBattle(state: BattleState, itemId: string): BattleState {
   const invItem = state.player.inventory?.find(i => i.itemId === itemId);
   if (!invItem || invItem.quantity <= 0) {
-    return { ...state, battleLog: [...state.battleLog, '沒有該道具！'] };
+    return { ...state, battleLog: [...state.battleLog, 'その道具がありません！'] };
   }
 
   const item = ITEMS[itemId];
   if (!item) {
-    return { ...state, battleLog: [...state.battleLog, '未知道具！'] };
+    return { ...state, battleLog: [...state.battleLog, '未知の道具！'] };
   }
 
   let newStats = { ...state.player.stats };
-  let log = `你使用了 ${item.name}！`;
+  let log = `${item.name}を使用した！`;
   const newActiveBuffs = [...(state.player.activeBuffs ?? [])];
 
   const maxHp = calcPlayerMaxHp(state.player);
@@ -879,22 +879,22 @@ export function performUseItemInBattle(state: BattleState, itemId: string): Batt
   if (item.effect.hpRestore) {
     const heal = item.effect.hpRestore;
     newStats = { ...newStats, hp: Math.min(maxHp, newStats.hp + heal) };
-    log += ` 回復 ${heal} HP。`;
+    log += ` ${heal}HP回復！`;
   }
   if (item.effect.hpRestorePercent) {
     const heal = Math.floor(maxHp * item.effect.hpRestorePercent);
     newStats = { ...newStats, hp: Math.min(maxHp, newStats.hp + heal) };
-    log += ` 回復 ${heal} HP。`;
+    log += ` ${heal}HP回復！`;
   }
   if (item.effect.mdRestore) {
     const restore = item.effect.mdRestore;
     newStats = { ...newStats, md: Math.min(newStats.maxMd, newStats.md + restore) };
-    log += ` 回復 ${restore} Chakra。`;
+    log += ` Chakraを${restore}回復！`;
   }
   if (item.effect.mdRestorePercent) {
     const restore = Math.floor(newStats.maxMd * item.effect.mdRestorePercent);
     newStats = { ...newStats, md: Math.min(newStats.maxMd, newStats.md + restore) };
-    log += ` 回復 ${restore} Chakra。`;
+    log += ` Chakraを${restore}回復！`;
   }
   if (item.effect.buffDuration) {
     const buff: ActiveBuff = {
@@ -905,7 +905,7 @@ export function performUseItemInBattle(state: BattleState, itemId: string): Batt
       spdBonus: item.effect.spdBonus,
     };
     newActiveBuffs.push(buff);
-    log += ` 獲得強化效果（${item.effect.buffDuration}回合）。`;
+    log += ` 強化効果（${item.effect.buffDuration}ターン）を獲得！`;
   }
 
   const newInventory = deductInventoryItem(state.player.inventory ?? [], itemId);
@@ -931,44 +931,44 @@ export function applyItemEffect(
 ): { player: PlayerState; message: string; success: boolean } {
   const invItem = player.inventory?.find(i => i.itemId === itemId);
   if (!invItem || invItem.quantity <= 0) {
-    return { player, message: '沒有該道具！', success: false };
+    return { player, message: 'その道具がありません！', success: false };
   }
 
   const item = ITEMS[itemId];
   if (!item || !item.usableOutOfCombat) {
-    return { player, message: '此道具不能在戰鬥外使用！', success: false };
+    return { player, message: 'この道具は戦闘外では使えません！', success: false };
   }
 
   let newStats = { ...player.stats };
   let newStamina = player.stamina;
-  let msg = `你使用了 ${item.name}！`;
+  let msg = `${item.name}を使用した！`;
 
   const maxHp = calcPlayerMaxHp(player);
 
   if (item.effect.hpRestore) {
     const heal = item.effect.hpRestore;
     newStats = { ...newStats, hp: Math.min(maxHp, newStats.hp + heal) };
-    msg += ` 回復 ${heal} HP。`;
+    msg += ` ${heal}HP回復！`;
   }
   if (item.effect.hpRestorePercent) {
     const heal = Math.floor(maxHp * item.effect.hpRestorePercent);
     newStats = { ...newStats, hp: Math.min(maxHp, newStats.hp + heal) };
-    msg += ` 回復 ${heal} HP。`;
+    msg += ` ${heal}HP回復！`;
   }
   if (item.effect.mdRestore) {
     const restore = item.effect.mdRestore;
     newStats = { ...newStats, md: Math.min(newStats.maxMd, newStats.md + restore) };
-    msg += ` 回復 ${restore} Chakra。`;
+    msg += ` Chakraを${restore}回復！`;
   }
   if (item.effect.mdRestorePercent) {
     const restore = Math.floor(newStats.maxMd * item.effect.mdRestorePercent);
     newStats = { ...newStats, md: Math.min(newStats.maxMd, newStats.md + restore) };
-    msg += ` 回復 ${restore} Chakra。`;
+    msg += ` Chakraを${restore}回復！`;
   }
   if (item.effect.staminaRestore) {
     const restore = item.effect.staminaRestore;
     newStamina = Math.min(player.maxStamina, newStamina + restore);
-    msg += ` 回復 ${restore} 精力。`;
+    msg += ` スタミナを${restore}回復！`;
   }
 
   const newInventory = deductInventoryItem(player.inventory ?? [], itemId);

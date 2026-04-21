@@ -125,7 +125,7 @@ export function StatusScreen() {
             const nextThreshold = masteryLevel === 1 ? 20 : masteryLevel === 2 ? 60 : 100;
             const masteryPct = Math.min(100, (skillMastery / nextThreshold) * 100);
             return (
-              <div key={skill.id} style={{ marginBottom: '10px', padding: '8px', border: `1px solid ${masteryLevel === 3 ? '#f0a030' : masteryLevel === 2 ? '#4488ff' : '#2a2a3a'}`, borderRadius: '4px' }}>
+              <div key={skill.id} style={{ marginBottom: '10px', padding: '8px', border: `1px solid ${masteryLevel === 3 ? 'var(--color-gold)' : masteryLevel === 2 ? 'var(--color-blue)' : 'var(--color-border)'}`, borderRadius: '4px' }}>
                 <div className="text-bold">
                   {effectiveSkill.name}{tierLabel}
                   {player.stats.level < skill.requiredLevel && (
@@ -145,7 +145,7 @@ export function StatusScreen() {
                 <div style={{ marginTop: '4px' }}>
                   <div className="text-small text-gray">習熟度: {skillMastery} {masteryLevel < 3 ? `/ ${nextThreshold}` : '(MAX)'}</div>
                   <div style={{ background: '#1a1a2e', borderRadius: '2px', height: '4px', marginTop: '2px' }}>
-                    <div style={{ background: masteryLevel === 3 ? '#f0a030' : '#4488ff', width: `${masteryPct}%`, height: '100%', borderRadius: '2px', transition: 'width 0.3s' }} />
+                    <div style={{ background: masteryLevel === 3 ? 'var(--color-gold)' : 'var(--color-blue)', width: `${masteryPct}%`, height: '100%', borderRadius: '2px', transition: 'width 0.3s' }} />
                   </div>
                 </div>
               </div>

@@ -21,8 +21,8 @@ export function QuestScreen() {
   return (
     <div className="screen">
       <div className="header-bar">
-        <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'HUB' })}>← 返回</button>
-        <span className="game-title" style={{ fontSize: '1.1rem' }}>⚔ 任務</span>
+        <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'HUB' })}>← 戻る</button>
+        <span className="game-title" style={{ fontSize: '1.1rem' }}>⚔ <ruby>任務<rt>にんむ</rt></ruby></span>
         <span className="text-gold">LV {player.stats.level} | ⚡{player.stamina}</span>
       </div>
 
@@ -59,7 +59,7 @@ export function QuestScreen() {
                   <div className="text-small text-gray" style={{ marginTop: '4px' }}>{quest.description}</div>
                   <div className="flex-row text-small" style={{ marginTop: '6px', justifyContent: 'space-between' }}>
                     <span>
-                      擊敗 {quest.targetCount}× {enemyDef?.name ?? quest.targetEnemyId}
+                      {quest.targetCount}体の {enemyDef?.name ?? quest.targetEnemyId}を<ruby>倒<rt>たお</rt></ruby>せ
                       {enemyDef?.element && <span> {ELEMENT_EMOJI[enemyDef.element]}</span>}
                       {enemyDef?.specialAbility === 'GUARD' && <span className="text-gray"> 🛡</span>}
                       {enemyDef?.specialAbility === 'CHARGE' && <span className="text-gray"> ⚡</span>}
@@ -71,22 +71,22 @@ export function QuestScreen() {
                   </div>
                   <div className="flex-row text-small" style={{ marginTop: '4px', justifyContent: 'space-between' }}>
                     <span className={staminaInsufficient ? 'text-red' : 'text-gray'}>
-                      ⚡ {quest.staminaCost} 精力{staminaInsufficient ? '（不足）' : ''}
+                      ⚡ {quest.staminaCost} スタミナ{staminaInsufficient ? '（<ruby>不足<rt>ふそく</rt></ruby>）' : ''}
                     </span>
                   </div>
                   {isLocked && (
                     <div className="text-small text-red" style={{ marginTop: '4px' }}>
-                      🔒 需等級 {quest.requiredLevel}
+                      🔒 <ruby>必要<rt>ひつよう</rt></ruby>レベル {quest.requiredLevel}
                     </div>
                   )}
                   {isDailyDone && (
                     <div className="text-small text-gray" style={{ marginTop: '4px' }}>
-                      🔄 明日重置
+                      🔄 <ruby>明日<rt>あした</rt></ruby>リセット
                     </div>
                   )}
                   {isOnceDone && (
                     <div className="text-small text-green" style={{ marginTop: '4px' }}>
-                      ✓ 已完成（不可重複）
+                      ✓ <ruby>達成済<rt>たっせいずみ</rt></ruby>み（<ruby>再<rt>さい</rt></ruby>プレイ<ruby>不可<rt>ふか</rt></ruby>）
                     </div>
                   )}
                 </div>

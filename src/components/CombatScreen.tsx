@@ -65,7 +65,7 @@ export function CombatScreen() {
       <div className="header-bar">
         <span className="text-gold">{quest.name}</span>
         <span className="text-small text-gray">
-          {battle.enemiesDefeated}/{quest.targetCount} 撃破 | ターン {battle.turnNumber}
+          {battle.enemiesDefeated}/{quest.targetCount} <ruby>撃破<rt>げきは</rt></ruby> | ターン {battle.turnNumber}
         </span>
       </div>
 
@@ -105,7 +105,7 @@ export function CombatScreen() {
                 {battle.playerStatusEffects.map((effect, i) => (
                   effect.type === 'ATK_DOWN' && (
                     <span key={i} className="debuff-badge">
-                      💜 攻擊↓{Math.round((effect.atkDebuffPercent ?? 0) * 100)}% ({effect.remainingTurns}t)
+                      💜 <ruby>攻撃<rt>こうげき</rt></ruby>↓{Math.round((effect.atkDebuffPercent ?? 0) * 100)}% ({effect.remainingTurns}t)
                     </span>
                   )
                 ))}
@@ -147,10 +147,10 @@ export function CombatScreen() {
       {/* Actions */}
       {!isVictory && !isDefeat && (
         <div className="card">
-          <div className="card-title">行動</div>
+          <div className="card-title"><ruby>行動<rt>こうどう</rt></ruby></div>
           <div className="combat-actions">
             <button className="btn btn-primary" disabled={!canAct} onClick={() => dispatch({ type: 'BATTLE_ATTACK' })}>
-              ⚔ 攻撃
+              ⚔ <ruby>攻撃<rt>こうげき</rt></ruby>
             </button>
             <button
               className="btn"
@@ -158,10 +158,10 @@ export function CombatScreen() {
               onClick={() => dispatch({ type: 'BATTLE_TOGGLE_MODE' })}
             >
               {player.isInMode
-                ? '⚡ 關閉仙人模式'
+                ? '⚡ 仙人モードをオフ'
                 : battle.modeCooldown > 0
-                  ? `⚡ 仙人模式 (CD: ${battle.modeCooldown}t)`
-                  : '⚡ 啟動仙人模式'}
+                  ? `⚡ 仙人モード (CD: ${battle.modeCooldown}t)`
+                  : '⚡ 仙人モードを発動'}
             </button>
             {availableSkills.map(skill => {
               const cd = battle.skillCooldowns.find(c => c.skillId === skill.id);
@@ -195,11 +195,11 @@ export function CombatScreen() {
               );
             })}
             <button className="btn btn-danger" onClick={() => dispatch({ type: 'BATTLE_RUN' })}>
-              🏃 逃跑
+              🏃 <ruby>逃走<rt>とうそう</rt></ruby>
             </button>
             {canAct && player.inventory && player.inventory.filter(inv => ITEMS[inv.itemId]?.usableInCombat && inv.quantity > 0).length > 0 && (
               <div style={{ gridColumn: '1 / -1' }}>
-                <div className="text-small text-gray" style={{ marginBottom: '4px' }}>🎒 道具</div>
+                <div className="text-small text-gray" style={{ marginBottom: '4px' }}>🎒 <ruby>道具<rt>どうぐ</rt></ruby></div>
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                   {player.inventory.filter(inv => ITEMS[inv.itemId]?.usableInCombat && inv.quantity > 0).map(inv => (
                     <button key={inv.itemId} className="btn" style={{ fontSize: '0.8rem' }}
@@ -219,10 +219,10 @@ export function CombatScreen() {
       {isVictory && !isQuestComplete && (
         <div className="card">
           <div className="text-bold text-gold" style={{ marginBottom: '8px' }}>
-            ✓ 敵人擊敗！({battle.enemiesDefeated + 1}/{quest.targetCount})
+            ✓ <ruby>敵<rt>てき</rt></ruby>を<ruby>倒<rt>たお</rt></ruby>した！({battle.enemiesDefeated + 1}/{quest.targetCount})
           </div>
           <button className="btn btn-primary" onClick={() => dispatch({ type: 'BATTLE_NEXT_ENEMY' })}>
-            下一個敵人 →
+            <ruby>次<rt>つぎ</rt></ruby>の<ruby>敵<rt>てき</rt></ruby> →
           </button>
         </div>
       )}
@@ -231,13 +231,13 @@ export function CombatScreen() {
       {isQuestComplete && (
         <div className="card">
           <div className="text-bold text-gold" style={{ marginBottom: '8px' }}>
-            🏆 任務完成！
+            🏆 ミッション<ruby>完了<rt>かんりょう</rt></ruby>！
           </div>
           <div className="text-small" style={{ marginBottom: '8px' }}>
-            獎勵：+{quest.reward.exp} EXP, +{quest.reward.ryo} Ryo
+            <ruby>報酬<rt>ほうしゅう</rt></ruby>：+{quest.reward.exp} EXP, +{quest.reward.ryo} Ryo
           </div>
           <button className="btn btn-success" onClick={() => dispatch({ type: 'COLLECT_QUEST_REWARD' })}>
-            領取獎勵
+            <ruby>報酬<rt>ほうしゅう</rt></ruby>を<ruby>受<rt>う</rt></ruby>け<ruby>取<rt>と</rt></ruby>る
           </button>
         </div>
       )}
@@ -245,10 +245,10 @@ export function CombatScreen() {
       {isDefeat && (
         <div className="card">
           <div className="text-bold text-red" style={{ marginBottom: '8px' }}>
-            💀 你被擊敗了…
+            💀 <ruby>敗北<rt>はいぼく</rt></ruby>した…
           </div>
           <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'HUB' })}>
-            返回據點
+            <ruby>拠点<rt>きょてん</rt></ruby>に<ruby>戻<rt>もど</rt></ruby>る
           </button>
         </div>
       )}

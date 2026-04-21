@@ -20,20 +20,20 @@ export function ClinicScreen() {
   const minsUntil = Math.floor(secsUntil / 60);
   const secsLeft = secsUntil % 60;
   const recoveryLabel = player.stamina >= player.maxStamina
-    ? '精力已滿'
-    : `${minsUntil}:${String(secsLeft).padStart(2, '0')} 後 +${STAMINA_RECOVERY_AMOUNT}`;
+    ? 'スタミナ満タン'
+    : `${minsUntil}分${String(secsLeft).padStart(2, '0')}秒後に +${STAMINA_RECOVERY_AMOUNT}`;
 
   return (
     <div className="screen">
       <div className="header-bar">
-        <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'HUB' })}>← 返回</button>
-        <span className="game-title" style={{ fontSize: '1.1rem' }}>🏥 診療所</span>
+        <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'HUB' })}>← 戻る</button>
+        <span className="game-title" style={{ fontSize: '1.1rem' }}>🏥 <ruby>診療所<rt>しんりょうじょ</rt></ruby></span>
         <span className="text-gold">💰 {player.ryo} Ryo</span>
       </div>
 
       {/* Current Status */}
       <div className="card">
-        <div className="card-title">📋 目前狀態</div>
+        <div className="card-title">📋 <ruby>現在<rt>げんざい</rt></ruby>の<ruby>状態<rt>じょうたい</rt></ruby></div>
         <div className="hp-bar-container">
           <div className="hp-bar-label">
             <span className="text-red">HP</span>
@@ -54,7 +54,7 @@ export function ClinicScreen() {
         </div>
         <div className="hp-bar-container" style={{ marginTop: '8px' }}>
           <div className="hp-bar-label">
-            <span className="text-orange">精力</span>
+            <span className="text-orange">スタミナ</span>
             <span>{player.stamina} / {player.maxStamina} <span className="text-small text-gray">({recoveryLabel})</span></span>
           </div>
           <div className="hp-bar">
@@ -65,17 +65,17 @@ export function ClinicScreen() {
 
       {/* Free Rest */}
       <div className="card">
-        <div className="card-title">😴 免費休息（每日一次）</div>
+        <div className="card-title">😴 <ruby>無料<rt>むりょう</rt></ruby><ruby>休憩<rt>きゅうけい</rt></ruby>（1<ruby>日<rt>にち</rt></ruby>1<ruby>回<rt>かい</rt></ruby>）</div>
         <div className="text-small text-gray" style={{ marginBottom: '12px' }}>
-          回復 50% HP + 50% Chakra。每日限使用一次。（精力請使用精力丹）
+          HPとChakraを50%<ruby>回復<rt>かいふく</rt></ruby>する。1<ruby>日<rt>にち</rt></ruby>1<ruby>回限<rt>かいかぎ</rt></ruby>り。（スタミナはスタミナ<ruby>丸<rt>まる</rt></ruby>を<ruby>使用<rt>しよう</rt></ruby>）
         </div>
         {freeRestUsedToday ? (
           <div className="text-small text-red" style={{ marginBottom: '8px' }}>
-            ✗ 今日已使用免費休息
+            ✗ <ruby>本日<rt>ほんじつ</rt></ruby>の<ruby>無料休憩<rt>むりょうきゅうけい</rt></ruby>は<ruby>使用済<rt>しようずみ</rt></ruby>み
           </div>
         ) : (
           <div className="text-small text-green" style={{ marginBottom: '8px' }}>
-            ✓ 可使用免費休息
+            ✓ <ruby>無料休憩<rt>むりょうきゅうけい</rt></ruby>が<ruby>使用可能<rt>しようかのう</rt></ruby>
           </div>
         )}
         <button
@@ -84,15 +84,15 @@ export function ClinicScreen() {
           disabled={freeRestUsedToday}
           onClick={() => dispatch({ type: 'REST_FREE' })}
         >
-          😴 免費休息（+50% HP / Chakra）
+          😴 <ruby>無料休憩<rt>むりょうきゅうけい</rt></ruby>（HP/Chakra +50%）
         </button>
       </div>
 
       {/* Paid Treatment */}
       <div className="card">
-        <div className="card-title">💊 醫療忍者治療（全回復）</div>
+        <div className="card-title">💊 <ruby>医療忍者<rt>いりょうにんじゃ</rt></ruby>による<ruby>治療<rt>ちりょう</rt></ruby>（<ruby>全回復<rt>ぜんかいふく</rt></ruby>）</div>
         <div className="text-small text-gray" style={{ marginBottom: '8px' }}>
-          消耗 Ryo 全回復 HP 和 Chakra。（精力不在此回復）
+          Ryoを<ruby>消費<rt>しょうひ</rt></ruby>してHPとChakraを<ruby>全回復<rt>ぜんかいふく</rt></ruby>する。（スタミナは<ruby>回復<rt>かいふく</rt></ruby>しない）
         </div>
         <div className="text-small" style={{ marginBottom: '12px' }}>
           {CLINIC_COSTS.map((b, i) => {
@@ -105,7 +105,7 @@ export function ClinicScreen() {
                 className={`stat-row ${isCurrentBracket ? 'text-gold' : 'text-gray'}`}
               >
                 <span>LV{minLv}–{b.maxLevel}</span>
-                <span>{b.cost} Ryo {isCurrentBracket && '← 目前'}</span>
+                <span>{b.cost} Ryo {isCurrentBracket && '← 現在'}</span>
               </div>
             );
           })}
@@ -116,11 +116,11 @@ export function ClinicScreen() {
           disabled={player.ryo < payCost}
           onClick={() => dispatch({ type: 'REST_PAY' })}
         >
-          💊 付費治療（{payCost} Ryo）— 全回復
+          💊 <ruby>有料治療<rt>ゆうりょうちりょう</rt></ruby>（{payCost} Ryo）— <ruby>全回復<rt>ぜんかいふく</rt></ruby>
         </button>
         {player.ryo < payCost && (
           <div className="text-small text-red" style={{ marginTop: '6px' }}>
-            Ryo 不足（需要 {payCost} Ryo，現有 {player.ryo}）
+            Ryoが<ruby>不足<rt>ふそく</rt></ruby>（<ruby>必要<rt>ひつよう</rt></ruby>: {payCost} Ryo、<ruby>現在<rt>げんざい</rt></ruby>: {player.ryo}）
           </div>
         )}
       </div>

@@ -1,3 +1,9 @@
+:root {
+  --color-gold: #f0a030;
+  --color-blue: #4488ff;
+  --color-border: #2a2a3a;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;

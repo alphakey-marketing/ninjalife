@@ -1,11 +1,18 @@
+import React from 'react';
 import { useGame } from '../gameStore';
 import { GEAR, GEAR_SHOP_IDS } from '../constants';
 import type { GearSlot } from '../types';
 
-const slotLabel: Record<GearSlot, string> = {
-  WEAPON: '⚔ 武器',
-  ARMOR: '🛡 護甲',
-  ACCESSORY: '💍 飾品',
+const slotLabel: Record<GearSlot, React.ReactNode> = {
+  WEAPON: <><ruby>武器<rt>ぶき</rt></ruby></>,
+  ARMOR: <><ruby>鎧<rt>よろい</rt></ruby></>,
+  ACCESSORY: <><ruby>装飾品<rt>そうしょくひん</rt></ruby></>,
+};
+
+const slotEmoji: Record<GearSlot, string> = {
+  WEAPON: '⚔',
+  ARMOR: '🛡',
+  ACCESSORY: '💍',
 };
 
 const rarityColor: Record<string, string> = {
@@ -22,7 +29,7 @@ function GearStatLine({ stats }: { stats: import('../types').GearStats }) {
       {stats.hpBonus ? `HP +${stats.hpBonus} ` : ''}
       {stats.spdBonus ? `SPD +${stats.spdBonus} ` : ''}
       {stats.mdRegenBonus ? `Chakra回復 +${stats.mdRegenBonus} ` : ''}
-      {stats.hpRegenPerTurn ? `HP回復/回合 +${stats.hpRegenPerTurn}` : ''}
+      {stats.hpRegenPerTurn ? `HP回復/ターン +${stats.hpRegenPerTurn}` : ''}
     </div>
   );
 }
@@ -36,21 +43,21 @@ export function GearScreen() {
   return (
     <div className="screen">
       <div className="header-bar">
-        <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'HUB' })}>← 返回</button>
-        <span className="game-title" style={{ fontSize: '1.1rem' }}>🗡 裝備</span>
+        <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'HUB' })}>← 戻る</button>
+        <span className="game-title" style={{ fontSize: '1.1rem' }}>🗡 <ruby>装備<rt>そうび</rt></ruby></span>
         <span className="text-gold">💰 {player.ryo} Ryo</span>
       </div>
 
       {/* Equipped Gear */}
       <div className="card">
-        <div className="card-title">🎯 目前裝備</div>
+        <div className="card-title">🎯 <ruby>現在<rt>げんざい</rt></ruby>の<ruby>装備<rt>そうび</rt></ruby></div>
         {slots.map(slot => {
           const slotKey = slot.toLowerCase() as 'weapon' | 'armor' | 'accessory';
           const equippedId = player.equippedGear?.[slotKey] ?? null;
           const gear = equippedId ? GEAR[equippedId] : null;
           return (
             <div key={slot} className="stat-row" style={{ paddingTop: '8px', paddingBottom: '8px' }}>
-              <span className="stat-label">{slotLabel[slot]}</span>
+              <span className="stat-label">{slotEmoji[slot]} {slotLabel[slot]}</span>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 {gear ? (
                   <>
@@ -60,11 +67,11 @@ export function GearScreen() {
                       style={{ padding: '2px 8px' }}
                       onClick={() => dispatch({ type: 'UNEQUIP_GEAR', slot })}
                     >
-                      卸除
+                      <ruby>外<rt>はず</rt></ruby>す
                     </button>
                   </>
                 ) : (
-                  <span className="text-gray">— 未裝備 —</span>
+                  <span className="text-gray">— <ruby>未装備<rt>みそうび</rt></ruby> —</span>
                 )}
               </div>
             </div>
@@ -75,7 +82,7 @@ export function GearScreen() {
       {/* Owned Gear */}
       {(player.ownedGearIds ?? []).length > 0 && (
         <div className="card">
-          <div className="card-title">🎒 持有裝備</div>
+          <div className="card-title">🎒 <ruby>所持<rt>しょじ</rt></ruby><ruby>装備<rt>そうび</rt></ruby></div>
           {(player.ownedGearIds ?? []).map(gearId => {
             const gear = GEAR[gearId];
             if (!gear) return null;
@@ -86,7 +93,7 @@ export function GearScreen() {
                 <div>
                   <div className={`text-bold ${rarityColor[gear.rarity]}`}>
                     {gear.name}
-                    <span className="text-small text-gray"> [{gear.rarity}] {slotLabel[gear.slot]}</span>
+                    <span className="text-small text-gray"> [{gear.rarity}] {slotEmoji[gear.slot]} {slotLabel[gear.slot]}</span>
                   </div>
                   <div className="text-small text-gray" style={{ marginTop: '2px' }}>{gear.description}</div>
                   <GearStatLine stats={gear.stats} />
@@ -97,14 +104,14 @@ export function GearScreen() {
                     onClick={() => dispatch({ type: 'EQUIP_GEAR', gearId })}
                     style={{ minWidth: '70px' }}
                   >
-                    {isEquipped ? '✓ 已裝備' : '裝備'}
+                    {isEquipped ? <><ruby>装備中<rt>そうびちゅう</rt></ruby></> : <ruby>装備<rt>そうび</rt></ruby>}
                   </button>
                   <button
                     className="btn btn-danger"
                     style={{ minWidth: '70px', fontSize: '0.8rem' }}
                     onClick={() => dispatch({ type: 'SELL_GEAR', gearId })}
                   >
-                    出售 (+{Math.floor(gear.price * 0.5)})
+                    <ruby>売却<rt>ばいきゃく</rt></ruby> (+{Math.floor(gear.price * 0.5)})
                   </button>
                 </div>
               </div>
@@ -115,7 +122,7 @@ export function GearScreen() {
 
       {/* Gear Shop */}
       <div className="card">
-        <div className="card-title">🛒 裝備商店</div>
+        <div className="card-title">🛒 <ruby>装備<rt>そうび</rt></ruby><ruby>商店<rt>しょうてん</rt></ruby></div>
         {GEAR_SHOP_IDS.map(gearId => {
           const gear = GEAR[gearId];
           if (!gear) return null;
@@ -126,7 +133,7 @@ export function GearScreen() {
               <div>
                 <div className={`text-bold ${rarityColor[gear.rarity]}`}>
                   {gear.name}
-                  <span className="text-small text-gray"> [{gear.rarity}] {slotLabel[gear.slot]}</span>
+                  <span className="text-small text-gray"> [{gear.rarity}] {slotEmoji[gear.slot]} {slotLabel[gear.slot]}</span>
                 </div>
                 <div className="text-small text-gray" style={{ marginTop: '2px' }}>{gear.description}</div>
                 <GearStatLine stats={gear.stats} />
@@ -135,7 +142,7 @@ export function GearScreen() {
                 </div>
               </div>
               {owned ? (
-                <span className="text-small text-green">✓ 已購買</span>
+                <span className="text-small text-green">✓ <ruby>購入済<rt>こうにゅうずみ</rt></ruby>み</span>
               ) : (
                 <button
                   className="btn btn-primary"
@@ -143,7 +150,7 @@ export function GearScreen() {
                   onClick={() => dispatch({ type: 'BUY_GEAR', gearId })}
                   style={{ minWidth: '70px' }}
                 >
-                  購買
+                  <ruby>購入<rt>こうにゅう</rt></ruby>
                 </button>
               )}
             </div>

@@ -930,7 +930,7 @@ export const SKILL_TIERS: Record<string, { kai?: SkillTierDefinition; ougi?: Ski
   },
   SAND_ARMOR: {
     kai: {
-      name: '砂瀑防護盾 改',
+      name: '砂瀑（さばく）の防護盾 改',
       description: '改良版砂防護。回復量が増加する。',
       effects: { damageMultiplier: 0, healSelfPercent: 0.35 },
     },
@@ -967,8 +967,8 @@ export const SKILL_TIERS: Record<string, { kai?: SkillTierDefinition; ougi?: Ski
   },
   WIND_SLASH: {
     kai: {
-      name: '風遁・風刃術 改',
-      description: '改良版風刃術。切れ味が増し、ダメージが向上する。',
+      name: '風遁・風刃（ふうじん）の術 改',
+      description: '改良版風刃の術。切れ味が増し、ダメージが向上する。',
       effects: { damageMultiplier: 2.0 },
     },
     ougi: {
@@ -991,8 +991,8 @@ export const SKILL_TIERS: Record<string, { kai?: SkillTierDefinition; ougi?: Ski
   },
   BONE_LANCE: {
     kai: {
-      name: '屍骨脈・骨矛 改',
-      description: '骨矛の貫通力が向上する。HP消費が軽減される。',
+      name: '屍骨脈（しこつみゃく）・骨槍（こつやり） 改',
+      description: '骨槍の貫通力が向上する。HP消費が軽減される。',
       effects: { damageMultiplier: 2.8 },
       hpCost: 12,
       mdCost: 25,

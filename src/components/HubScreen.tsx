@@ -20,8 +20,8 @@ export function HubScreen() {
   const minsUntil = Math.floor(secsUntil / 60);
   const secsLeft = secsUntil % 60;
   const recoveryLabel = player.stamina >= player.maxStamina
-    ? '精力已滿'
-    : `${minsUntil}:${String(secsLeft).padStart(2, '0')} 後 +${STAMINA_RECOVERY_AMOUNT}`;
+    ? 'スタミナ満タン'
+    : `${minsUntil}分${String(secsLeft).padStart(2, '0')}秒後に +${STAMINA_RECOVERY_AMOUNT}`;
 
   return (
     <div className="screen">
@@ -58,7 +58,7 @@ export function HubScreen() {
           </div>
           <div className="hp-bar-container">
             <div className="hp-bar-label">
-              <span className="text-orange">精力</span>
+              <span className="text-orange">スタミナ</span>
               <span>{player.stamina} / {player.maxStamina} <span className="text-small text-gray">({recoveryLabel})</span></span>
             </div>
             <div className="hp-bar">
@@ -96,24 +96,24 @@ export function HubScreen() {
 
       {/* Bloodline */}
       <div className="card">
-        <div className="card-title">🩸 血繼限界 (Kekkei Genkai)</div>
+        <div className="card-title">🩸 <ruby>血継限界<rt>けっけいげんかい</rt></ruby> (Kekkei Genkai)</div>
         {equipped ? (
           <div className="flex-row">
             <span className={`rarity-${equipped.rarity.toLowerCase()}`}>◆ {equipped.name}</span>
             <span className="text-small text-gray">[{equipped.rarity}]</span>
-            {player.isInMode && <span className="mode-active">⚡ 仙人模式</span>}
+            {player.isInMode && <span className="mode-active">⚡ <ruby>仙人<rt>せんにん</rt></ruby>モード</span>}
           </div>
         ) : (
-          <span className="text-gray">尚未裝備血繼限界。前往 SPIN 取得！</span>
+          <span className="text-gray"><ruby>血継限界<rt>けっけいげんかい</rt></ruby>が<ruby>未装備<rt>みそうび</rt></ruby>。SPINで<ruby>入手<rt>にゅうしゅ</rt></ruby>せよ！</span>
         )}
         {player.unlockedMode && !player.isInMode && (
-          <div className="text-small text-gray" style={{ marginTop: '4px' }}>仙人模式已解鎖（可在戰鬥中啟動）</div>
+          <div className="text-small text-gray" style={{ marginTop: '4px' }}><ruby>仙人<rt>せんにん</rt></ruby>モード<ruby>解放済<rt>かいほうずみ</rt></ruby>み（<ruby>戦闘中<rt>せんとうちゅう</rt></ruby>に<ruby>発動<rt>はつどう</rt></ruby>可能）</div>
         )}
       </div>
 
       {/* Gear Summary */}
       <div className="card">
-        <div className="card-title">🗡 裝備</div>
+        <div className="card-title">🗡 <ruby>装備<rt>そうび</rt></ruby></div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '4px' }}>
           {(['weapon', 'armor', 'accessory'] as const).map(slot => {
             const gearId = player.equippedGear?.[slot] ?? null;
@@ -136,29 +136,29 @@ export function HubScreen() {
 
       {/* Navigation */}
       <div className="card">
-        <div className="card-title">🗺 導航</div>
+        <div className="card-title">🗺 <ruby>ナビ<rt></rt></ruby></div>
         <div className="nav-buttons">
           <button className="btn btn-primary" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'QUEST' })}>
-            ⚔ 任務
+            ⚔ <ruby>任務<rt>にんむ</rt></ruby>
           </button>
           <button className="btn btn-primary" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'SPIN' })}>
-            🌀 血繼轉盤
+            🌀 <ruby>血継<rt>けっけい</rt></ruby>ガチャ
           </button>
           <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'STATUS' })}>
-            📊 狀態
+            📊 ステータス
           </button>
           <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'CLINIC' })}>
-            🏥 診療所
+            🏥 <ruby>診療所<rt>しんりょうじょ</rt></ruby>
           </button>
           <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'SHOP' })}>
-            🛒 商店
+            🛒 <ruby>商店<rt>しょうてん</rt></ruby>
           </button>
           <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'GEAR' })}>
-            🗡 裝備
+            🗡 <ruby>装備<rt>そうび</rt></ruby>
           </button>
           {canRankUp(player) && (
             <button className="btn btn-success" onClick={() => dispatch({ type: 'RANK_UP' })}>
-              ⬆ 晉升！
+              ⬆ <ruby>昇進<rt>しょうしん</rt></ruby>！
             </button>
           )}
         </div>
@@ -166,8 +166,8 @@ export function HubScreen() {
 
       {/* Save/Load */}
       <div className="flex-row">
-        <button className="btn text-small" onClick={() => dispatch({ type: 'SAVE_GAME' })}>💾 儲存</button>
-        <button className="btn text-small" onClick={() => dispatch({ type: 'LOAD_GAME' })}>📂 讀取</button>
+        <button className="btn text-small" onClick={() => dispatch({ type: 'SAVE_GAME' })}>💾 セーブ</button>
+        <button className="btn text-small" onClick={() => dispatch({ type: 'LOAD_GAME' })}>📂 ロード</button>
       </div>
     </div>
   );

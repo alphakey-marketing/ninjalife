@@ -169,16 +169,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (!quest) return state;
       const rankOrder: Record<string, number> = { E: 0, D: 1, C: 2 };
       if (rankOrder[quest.requiredRank] > rankOrder[state.player.rank]) {
-        return notify(state, 'Rank 不符！');
+        return notify(state, 'ランクが足りません！');
       }
       if (!isQuestAvailableForPlayer(quest, state.player)) {
-        return notify(state, quest.repeatType === 'ONCE' ? '此任務已完成！' : '今日任務已完成，明日再來！');
+        return notify(state, quest.repeatType === 'ONCE' ? 'このミッションは達成済みです！' : '本日のミッションは完了しました。明日また来てください！');
       }
       if (state.player.stats.level < quest.requiredLevel) {
         return notify(state, `Requires Level ${quest.requiredLevel}!`);
       }
       if (state.player.stamina < quest.staminaCost) {
-        return notify(state, `精力不足！需要 ${quest.staminaCost} 精力（現有 ${state.player.stamina}）`);
+        return notify(state, `スタミナ不足！必要: ${quest.staminaCost}（現在: ${state.player.stamina}）`);
       }
       const playerWithStamina = { ...state.player, stamina: state.player.stamina - quest.staminaCost };
       const battle = createBattle(playerWithStamina, action.questId);
@@ -227,7 +227,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         screen: 'HUB',
         battle: null,
         player: restoredPlayer,
-        notifications: [...state.notifications, '逃跑成功！'],
+        notifications: [...state.notifications, '逃走成功！'],
       };
     }
 
@@ -255,7 +255,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             player: updatedPlayer,
             enemiesDefeated: newDefeated,
             phase: 'QUEST_COMPLETE',
-            battleLog: [...state.battle.battleLog, '任務完成！領取你的報酬吧。'],
+            battleLog: [...state.battle.battleLog, 'ミッション完了！報酬を受け取れ。'],
           },
         };
       }
@@ -276,7 +276,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           },
           skillCooldowns: [],
           turnNumber: state.battle.turnNumber + 1,
-          battleLog: [...state.battle.battleLog, `新的 ${enemyDef.name} 出現！`],
+          battleLog: [...state.battle.battleLog, `新しい ${enemyDef.name} が現れた！`],
           phase: 'PLAYER_TURN',
           enemiesDefeated: newDefeated,
           playerStatusEffects: state.battle.playerStatusEffects ?? [],
@@ -327,12 +327,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         screen: 'HUB',
         battle: null,
         player,
-        notifications: [...state.notifications, `任務完成！+${quest.reward.exp} EXP +${quest.reward.ryo} Ryo`],
+        notifications: [...state.notifications, `ミッション完了！+${quest.reward.exp} EXP +${quest.reward.ryo} Ryo`],
       };
 
       // Level-up notifications for each level gained
       for (let lv = preRewardLevel + 1; lv <= player.stats.level; lv++) {
-        finalState = notify(finalState, `⬆ 升級！現在是 Level ${lv}！`);
+        finalState = notify(finalState, `⬆ レベルアップ！Level ${lv} になった！`);
       }
 
       // Auto-save after quest completion
@@ -353,7 +353,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const newPlayer = equipBloodline(state.player, action.bloodlineId);
       const unlockedMode = newPlayer.stats.level >= 10 && !!newPlayer.equippedBloodlineId;
       return {
-        ...notify(state, `已裝備 ${action.bloodlineId} 血繼限界！`),
+        ...notify(state, `血継限界を装備しました！`),
         player: { ...newPlayer, unlockedMode: unlockedMode || newPlayer.unlockedMode },
       };
     }
@@ -365,10 +365,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'RANK_UP': {
       if (!canRankUp(state.player)) {
-        return notify(state, '尚未滿足晉升條件！需要 LV30 並擊敗 BOSS。');
+        return notify(state, 'まだ昇進条件を満たしていません！LV30とBOSS討伐が必要です。');
       }
       const newPlayer = performRankUp(state.player);
-      return notify({ ...state, player: newPlayer }, `恭喜晉升至 Rank ${newPlayer.rank}！`);
+      return notify({ ...state, player: newPlayer }, `おめでとう！Rank ${newPlayer.rank} に昇進しました！`);
     }
 
     case 'REST_FREE': {
@@ -385,15 +385,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'BUY_ITEM': {
       const item = ITEMS[action.itemId];
-      if (!item) return notify(state, '未知道具！');
-      if (state.player.ryo < item.price) return notify(state, `Ryo 不足！需要 ${item.price} Ryo。`);
+      if (!item) return notify(state, '未知の道具！');
+      if (state.player.ryo < item.price) return notify(state, `Ryoが不足しています！必要: ${item.price} Ryo。`);
       const existing = state.player.inventory.find(i => i.itemId === action.itemId);
       const newInventory = existing
         ? state.player.inventory.map(i => i.itemId === action.itemId ? { ...i, quantity: i.quantity + 1 } : i)
         : [...state.player.inventory, { itemId: action.itemId, quantity: 1 }];
       return notify(
         { ...state, player: { ...state.player, ryo: state.player.ryo - item.price, inventory: newInventory } },
-        `已購買 ${item.name}！`,
+        `${item.name}を購入しました！`,
       );
     }
 
@@ -421,9 +421,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'BUY_GEAR': {
       const gear = GEAR[action.gearId];
-      if (!gear) return notify(state, '未知裝備！');
-      if (state.player.ryo < gear.price) return notify(state, `Ryo 不足！需要 ${gear.price} Ryo。`);
-      if (state.player.ownedGearIds?.includes(action.gearId)) return notify(state, '已擁有此裝備！');
+      if (!gear) return notify(state, '未知の装備！');
+      if (state.player.ryo < gear.price) return notify(state, `Ryoが不足しています！必要: ${gear.price} Ryo。`);
+      if (state.player.ownedGearIds?.includes(action.gearId)) return notify(state, 'この装備はすでに所持しています！');
       return notify(
         {
           ...state,
@@ -433,7 +433,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             ownedGearIds: [...(state.player.ownedGearIds ?? []), action.gearId],
           },
         },
-        `已購買 ${gear.name}！`,
+        `${gear.name}を購入しました！`,
       );
     }
 
@@ -455,9 +455,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'SAVE_GAME': {
       try {
         localStorage.setItem('ninjalife_save', JSON.stringify({ saveVersion: SAVE_VERSION, player: state.player }));
-        return notify(state, '遊戲已儲存！');
+        return notify(state, 'ゲームを保存しました！');
       } catch {
-        return notify(state, '儲存失敗！');
+        return notify(state, '保存に失敗しました！');
       }
     }
 
@@ -484,11 +484,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             equippedGear: rawPlayer.equippedGear ?? { weapon: null, armor: null, accessory: null },
             skillMasteries: rawPlayer.skillMasteries ?? {},
           };
-          return notify({ ...state, player, screen: 'HUB', battle: null }, '遊戲已讀取！');
+          return notify({ ...state, player, screen: 'HUB', battle: null }, 'ゲームを読み込みました！');
         }
-        return notify(state, '找不到存檔！');
+        return notify(state, 'セーブデータが見つかりません！');
       } catch {
-        return notify(state, '讀取失敗！');
+        return notify(state, '読み込みに失敗しました！');
       }
     }
 
@@ -500,23 +500,23 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'SELL_ITEM': {
       const item = ITEMS[action.itemId];
-      if (!item) return notify(state, '未知道具！');
+      if (!item) return notify(state, '未知の道具！');
       const invItem = state.player.inventory.find(i => i.itemId === action.itemId);
-      if (!invItem || invItem.quantity <= 0) return notify(state, '未持有此道具！');
+      if (!invItem || invItem.quantity <= 0) return notify(state, 'この道具を所持していません！');
       const sellPrice = Math.floor(item.price * 0.5);
       const newInventory = state.player.inventory
         .map(i => i.itemId === action.itemId ? { ...i, quantity: i.quantity - 1 } : i)
         .filter(i => i.quantity > 0);
       return notify(
         { ...state, player: { ...state.player, ryo: state.player.ryo + sellPrice, inventory: newInventory } },
-        `已出售 ${item.name}！+${sellPrice} Ryo`,
+        `${item.name}を売却しました！+${sellPrice} Ryo`,
       );
     }
 
     case 'SELL_GEAR': {
       const gear = GEAR[action.gearId];
-      if (!gear) return notify(state, '未知裝備！');
-      if (!state.player.ownedGearIds.includes(action.gearId)) return notify(state, '未持有此裝備！');
+      if (!gear) return notify(state, '未知の装備！');
+      if (!state.player.ownedGearIds.includes(action.gearId)) return notify(state, 'この装備を所持していません！');
       const sellPrice = Math.floor(gear.price * 0.5);
       const slotKey = gear.slot.toLowerCase() as 'weapon' | 'armor' | 'accessory';
       const newEquippedGear = { ...state.player.equippedGear };
@@ -531,7 +531,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             equippedGear: newEquippedGear,
           },
         },
-        `已出售 ${gear.name}！+${sellPrice} Ryo`,
+        `${gear.name}を売却しました！+${sellPrice} Ryo`,
       );
     }
 
