@@ -50,6 +50,8 @@ type GameAction =
   | { type: 'EQUIP_GEAR'; gearId: string }
   | { type: 'UNEQUIP_GEAR'; slot: 'WEAPON' | 'ARMOR' | 'ACCESSORY' }
   | { type: 'BUY_GEAR'; gearId: string }
+  | { type: 'SELL_ITEM'; itemId: string }
+  | { type: 'SELL_GEAR'; gearId: string }
   | { type: 'STAMINA_TICK' }
   | { type: 'SAVE_GAME' }
   | { type: 'LOAD_GAME' }
@@ -497,8 +499,71 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'SET_PLAYER_NAME':
       return { ...state, player: { ...state.player, name: action.name }, screen: 'HUB' };
 
+    case 'SELL_ITEM': {
+      const item = ITEMS[action.itemId];
+      if (!item) return notify(state, '未知道具！');
+      const invItem = state.player.inventory.find(i => i.itemId === action.itemId);
+      if (!invItem || invItem.quantity <= 0) return notify(state, '未持有此道具！');
+      const sellPrice = Math.floor(item.price * 0.5);
+      const newInventory = state.player.inventory
+        .map(i => i.itemId === action.itemId ? { ...i, quantity: i.quantity - 1 } : i)
+        .filter(i => i.quantity > 0);
+      return notify(
+        { ...state, player: { ...state.player, ryo: state.player.ryo + sellPrice, inventory: newInventory } },
+        `已出售 ${item.name}！+${sellPrice} Ryo`,
+      );
+    }
+
+    case 'SELL_GEAR': {
+      const gear = GEAR[action.gearId];
+      if (!gear) return notify(state, '未知裝備！');
+      if (!state.player.ownedGearIds.includes(action.gearId)) return notify(state, '未持有此裝備！');
+      const sellPrice = Math.floor(gear.price * 0.5);
+      const slotKey = gear.slot.toLowerCase() as 'weapon' | 'armor' | 'accessory';
+      const newEquippedGear = { ...state.player.equippedGear };
+      if (newEquippedGear[slotKey] === action.gearId) newEquippedGear[slotKey] = null;
+      return notify(
+        {
+          ...state,
+          player: {
+            ...state.player,
+            ryo: state.player.ryo + sellPrice,
+            ownedGearIds: state.player.ownedGearIds.filter(id => id !== action.gearId),
+            equippedGear: newEquippedGear,
+          },
+        },
+        `已出售 ${gear.name}！+${sellPrice} Ryo`,
+      );
+    }
+
     default:
       return state;
+  }
+}
+
+function tryAutoLoadState(): GameState {
+  try {
+    const saved = localStorage.getItem('ninjalife_save');
+    if (!saved) return initialState;
+    const raw = JSON.parse(saved);
+    const rawPlayer = (raw.saveVersion !== undefined ? raw.player : raw) as PlayerState & { freeRestUsedToday?: boolean };
+    const { freeRestUsedToday: _deprecated, ...cleanPlayer } = rawPlayer;
+    const player: PlayerState = {
+      ...cleanPlayer,
+      completedQuestIds: rawPlayer.completedQuestIds ?? [],
+      lastFreeRestDate: rawPlayer.lastFreeRestDate ?? (_deprecated ? getTodayString() : ''),
+      inventory: rawPlayer.inventory ?? [],
+      activeBuffs: rawPlayer.activeBuffs ?? [],
+      questResetTimestamps: rawPlayer.questResetTimestamps ?? {},
+      stamina: rawPlayer.stamina ?? MAX_STAMINA,
+      maxStamina: rawPlayer.maxStamina ?? MAX_STAMINA,
+      lastStaminaRecovery: rawPlayer.lastStaminaRecovery ?? Date.now(),
+      ownedGearIds: rawPlayer.ownedGearIds ?? [],
+      equippedGear: rawPlayer.equippedGear ?? { weapon: null, armor: null, accessory: null },
+    };
+    return { screen: 'HUB', player, battle: null, notifications: [] };
+  } catch {
+    return initialState;
   }
 }
 
@@ -508,7 +573,7 @@ const GameContext = createContext<{
 } | null>(null);
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(gameReducer, initialState);
+  const [state, dispatch] = useReducer(gameReducer, undefined, tryAutoLoadState);
 
   // Auto-dequeue the front notification after 3 seconds so queued ones show in order
   useEffect(() => {
@@ -518,9 +583,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state.notifications]);
 
-  // Stamina real-time recovery: check every 30s
+  // Stamina real-time recovery: check every 60s
   useEffect(() => {
-    const interval = setInterval(() => dispatch({ type: 'STAMINA_TICK' }), 30_000);
+    const interval = setInterval(() => dispatch({ type: 'STAMINA_TICK' }), 60_000);
     return () => clearInterval(interval);
   }, []);
 

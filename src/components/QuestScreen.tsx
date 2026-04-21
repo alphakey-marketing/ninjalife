@@ -21,8 +21,8 @@ export function QuestScreen() {
   return (
     <div className="screen">
       <div className="header-bar">
-        <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'HUB' })}>← Back</button>
-        <span className="game-title" style={{ fontSize: '1.1rem' }}>⚔ Quests</span>
+        <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'HUB' })}>← 返回</button>
+        <span className="game-title" style={{ fontSize: '1.1rem' }}>⚔ 任務</span>
         <span className="text-gold">LV {player.stats.level} | ⚡{player.stamina}</span>
       </div>
 
@@ -59,7 +59,7 @@ export function QuestScreen() {
                   <div className="text-small text-gray" style={{ marginTop: '4px' }}>{quest.description}</div>
                   <div className="flex-row text-small" style={{ marginTop: '6px', justifyContent: 'space-between' }}>
                     <span>
-                      Defeat {quest.targetCount}× {enemyDef?.name ?? quest.targetEnemyId}
+                      擊敗 {quest.targetCount}× {enemyDef?.name ?? quest.targetEnemyId}
                       {enemyDef?.specialAbility === 'GUARD' && <span className="text-gray"> 🛡</span>}
                       {enemyDef?.specialAbility === 'CHARGE' && <span className="text-gray"> ⚡</span>}
                       {enemyDef?.specialAbility === 'HEAL' && <span className="text-green"> 💚</span>}
@@ -75,7 +75,7 @@ export function QuestScreen() {
                   </div>
                   {isLocked && (
                     <div className="text-small text-red" style={{ marginTop: '4px' }}>
-                      🔒 Requires LV {quest.requiredLevel}
+                      🔒 需等級 {quest.requiredLevel}
                     </div>
                   )}
                   {isDailyDone && (

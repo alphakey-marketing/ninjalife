@@ -91,13 +91,22 @@ export function GearScreen() {
                   <div className="text-small text-gray" style={{ marginTop: '2px' }}>{gear.description}</div>
                   <GearStatLine stats={gear.stats} />
                 </div>
-                <button
-                  className={`btn ${isEquipped ? 'btn-success' : 'btn-primary'}`}
-                  onClick={() => dispatch({ type: 'EQUIP_GEAR', gearId })}
-                  style={{ minWidth: '70px' }}
-                >
-                  {isEquipped ? '✓ 已裝備' : '裝備'}
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
+                  <button
+                    className={`btn ${isEquipped ? 'btn-success' : 'btn-primary'}`}
+                    onClick={() => dispatch({ type: 'EQUIP_GEAR', gearId })}
+                    style={{ minWidth: '70px' }}
+                  >
+                    {isEquipped ? '✓ 已裝備' : '裝備'}
+                  </button>
+                  <button
+                    className="btn btn-danger"
+                    style={{ minWidth: '70px', fontSize: '0.8rem' }}
+                    onClick={() => dispatch({ type: 'SELL_GEAR', gearId })}
+                  >
+                    出售 (+{Math.floor(gear.price * 0.5)})
+                  </button>
+                </div>
               </div>
             );
           })}

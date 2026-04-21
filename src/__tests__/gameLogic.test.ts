@@ -738,3 +738,77 @@ describe('isQuestAvailableForPlayer - UNLIMITED', () => {
     expect(isQuestAvailableForPlayer(quest, player)).toBe(true);
   });
 });
+
+// ── ATK_DOWN status effect lifecycle ─────────────────────────────────────────
+
+describe('ATK_DOWN lifecycle (apply → decrement → expire)', () => {
+  it('ATK_DOWN decrements each turn and expires', () => {
+    const battle = {
+      ...makeBattle(),
+      playerStatusEffects: [{ type: 'ATK_DOWN' as const, remainingTurns: 2, atkDebuffPercent: 0.20 }],
+    };
+
+    const after1Attack = performAttack(battle);
+    expect(after1Attack.playerStatusEffects.length).toBe(1);
+    expect(after1Attack.playerStatusEffects[0].remainingTurns).toBe(1);
+
+    const after2Attack = performAttack(after1Attack);
+    expect(after2Attack.playerStatusEffects.length).toBe(0);
+  });
+
+  it('ATK_DOWN reduces attack effectiveness', () => {
+    const normalBattle = makeBattle();
+    const debuffBattle = {
+      ...makeBattle(),
+      playerStatusEffects: [{ type: 'ATK_DOWN' as const, remainingTurns: 3, atkDebuffPercent: 0.50 }],
+    };
+    const normalResult = performAttack(normalBattle);
+    const debuffResult = performAttack(debuffBattle);
+    const normalDmg = 50 - normalResult.enemy.currentHp;
+    const debuffDmg = 50 - debuffResult.enemy.currentHp;
+    expect(debuffDmg).toBeLessThan(normalDmg);
+  });
+});
+
+// ── Gear + buff + Mode stat combination ──────────────────────────────────────
+
+describe('gear stats with scroll buff and Mode — no explosion', () => {
+  it('gear ATK bonus stacks additively before multipliers', () => {
+    const playerWithGear = makePlayer({
+      ownedGearIds: ['THUNDER_FANG'],
+      equippedGear: { weapon: 'THUNDER_FANG', armor: null, accessory: null },
+    });
+    // base 10 + 28 gear = 38 * 1.0 rank = 38
+    expect(calcPlayerAtk(playerWithGear)).toBe(38);
+  });
+
+  it('gear + scroll buff: buff multiplies after gear addition', () => {
+    const player = makePlayer({
+      ownedGearIds: ['STARTER_SWORD'],
+      equippedGear: { weapon: 'STARTER_SWORD', armor: null, accessory: null },
+      activeBuffs: [{ itemId: 'ATK_SCROLL', remainingTurns: 5, atkMultiplier: 1.2 }],
+    });
+    // (10 + 5) * 1.0 rank * 1.2 buff = 18
+    expect(calcPlayerAtk(player)).toBeCloseTo(18, 4);
+  });
+
+  it('gear + Mode: mode multiplies after gear addition', () => {
+    const player = makePlayer({
+      ownedGearIds: ['STARTER_SWORD'],
+      equippedGear: { weapon: 'STARTER_SWORD', armor: null, accessory: null },
+      isInMode: true,
+    });
+    const atk = calcPlayerAtk(player);
+    expect(atk).toBeGreaterThan(20);
+    expect(atk).toBeLessThan(200);
+  });
+
+  it('gear HP bonus does not multiply, just adds', () => {
+    const player = makePlayer({
+      ownedGearIds: ['SAGE_COAT'],
+      equippedGear: { weapon: null, armor: 'SAGE_COAT', accessory: null },
+    });
+    // base 100 + 60 = 160
+    expect(calcPlayerMaxHp(player)).toBe(160);
+  });
+});

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useGame } from '../gameStore';
 import { BLOODLINES, RARE_BLOODLINE_IDS, SPIN_CONFIG } from '../constants';
 
@@ -8,18 +8,67 @@ const rarityEmoji: Record<string, string> = {
   LEGENDARY: '★',
 };
 
+const rarityClass: Record<string, string> = {
+  COMMON: '',
+  RARE: 'rarity-rare',
+  LEGENDARY: 'rarity-legendary',
+};
+
 export function SpinScreen() {
   const { state, dispatch } = useGame();
   const { player } = state;
   const [isSpinning, setIsSpinning] = useState(false);
+  const [spinDisplayIdx, setSpinDisplayIdx] = useState(0);
+  const [spinResult, setSpinResult] = useState<string | null>(null);
+  const [showResultFlash, setShowResultFlash] = useState(false);
+  const spinIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const prevNotificationCount = useRef(state.notifications.length);
+
+  const entries = SPIN_CONFIG.entries;
 
   const handleSpin = () => {
     setIsSpinning(true);
-    setTimeout(() => {
-      dispatch({ type: 'SPIN' });
-      setIsSpinning(false);
-    }, 800);
+    setSpinResult(null);
+    setShowResultFlash(false);
+    prevNotificationCount.current = state.notifications.length;
+
+    const totalTicks = 36;
+    const startInterval = 60;
+    const endInterval = 220;
+
+    let scheduled = 0;
+
+    function scheduleNext() {
+      if (scheduled >= totalTicks) {
+        dispatch({ type: 'SPIN' });
+        return;
+      }
+      const progress = scheduled / totalTicks;
+      const delay = Math.floor(startInterval + (endInterval - startInterval) * progress);
+      spinIntervalRef.current = setTimeout(() => {
+        setSpinDisplayIdx(Math.floor(Math.random() * entries.length));
+        scheduled++;
+        scheduleNext();
+      }, delay);
+    }
+    scheduleNext();
   };
+
+  useEffect(() => {
+    if (isSpinning && state.notifications.length > prevNotificationCount.current) {
+      setIsSpinning(false);
+      const resultMsg = state.notifications[state.notifications.length - 1] ?? '';
+      setSpinResult(resultMsg);
+      setShowResultFlash(true);
+      setTimeout(() => setShowResultFlash(false), 1500);
+    }
+  }, [state.notifications.length, isSpinning]);
+
+  useEffect(() => {
+    return () => {
+      if (spinIntervalRef.current) clearTimeout(spinIntervalRef.current);
+    };
+  }, []);
 
   const rareIds = RARE_BLOODLINE_IDS;
   const totalWeight = SPIN_CONFIG.entries.reduce((sum, e) => {
@@ -27,10 +76,13 @@ export function SpinScreen() {
     return sum + e.baseWeight + bonus;
   }, 0);
 
+  const displayEntry = entries[spinDisplayIdx];
+  const displayBl = BLOODLINES[displayEntry.bloodlineId];
+
   return (
     <div className="screen">
       <div className="header-bar">
-        <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'HUB' })}>← Back</button>
+        <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'HUB' })}>← 返回</button>
         <span className="game-title" style={{ fontSize: '1.1rem' }}>🌀 血繼限界轉盤</span>
         <span className="text-gold">💰 {player.ryo} Ryo</span>
       </div>
@@ -41,7 +93,15 @@ export function SpinScreen() {
           重複抽到已有血繼限界可提升熟練度，每級熟練度提供 +2% 被動技能加成。
         </div>
         <div className="text-small text-gray" style={{ marginBottom: '12px' }}>
-          Cost: {SPIN_CONFIG.priceRyo} Ryo per spin
+          費用：{SPIN_CONFIG.priceRyo} Ryo / 次
+        </div>
+
+        {/* Roulette Display */}
+        <div className={`spin-wheel-display ${showResultFlash ? `spin-flash-${displayBl.rarity.toLowerCase()}` : ''}`}>
+          <div className={`rarity-${displayBl.rarity.toLowerCase()} text-bold`} style={{ fontSize: '1.3rem' }}>
+            {rarityEmoji[displayBl.rarity]} {displayBl.name}
+          </div>
+          <div className="text-small text-gray" style={{ marginTop: '4px' }}>[{displayBl.rarity}]</div>
         </div>
 
         {/* Odds Display */}
@@ -68,7 +128,7 @@ export function SpinScreen() {
         </div>
 
         <button
-          className={`btn btn-primary ${isSpinning ? 'spinning' : ''}`}
+          className="btn btn-primary"
           style={{ width: '100%', padding: '12px', fontSize: '1.1rem' }}
           disabled={player.ryo < SPIN_CONFIG.priceRyo || isSpinning}
           onClick={handleSpin}
@@ -76,12 +136,9 @@ export function SpinScreen() {
           {isSpinning ? '🌀 轉動中...' : '🌀 抽取！(100 Ryo)'}
         </button>
 
-        {state.notifications[0] && (
-          <div className="spin-result">
-            <span className={state.notifications[0].includes('宇智波') ? 'text-purple text-bold' :
-              state.notifications[0].includes('日向') || state.notifications[0].includes('霧隱') ? 'text-blue text-bold' : ''}>
-              {state.notifications[0]}
-            </span>
+        {spinResult && !isSpinning && (
+          <div className={`spin-result ${rarityClass[displayBl.rarity]}`}>
+            {spinResult}
           </div>
         )}
       </div>

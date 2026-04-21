@@ -67,15 +67,24 @@ export function ShopScreen() {
                   <span className="text-small text-gray"> ×{inv.quantity}</span>
                   <div className="text-small text-gray">{item.description}</div>
                 </div>
-                {item.usableOutOfCombat && (
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  {item.usableOutOfCombat && (
+                    <button
+                      className="btn btn-success"
+                      style={{ fontSize: '0.85rem' }}
+                      onClick={() => dispatch({ type: 'USE_ITEM', itemId: inv.itemId })}
+                    >
+                      使用
+                    </button>
+                  )}
                   <button
-                    className="btn btn-success"
+                    className="btn btn-danger"
                     style={{ fontSize: '0.85rem' }}
-                    onClick={() => dispatch({ type: 'USE_ITEM', itemId: inv.itemId })}
+                    onClick={() => dispatch({ type: 'SELL_ITEM', itemId: inv.itemId })}
                   >
-                    使用
+                    出售 (+{Math.floor(item.price * 0.5)} Ryo)
                   </button>
-                )}
+                </div>
               </div>
             );
           })

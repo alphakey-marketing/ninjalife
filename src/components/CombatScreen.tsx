@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useGame } from '../gameStore';
 import { BLOODLINES, ITEMS, QUESTS, SKILLS } from '../constants';
 import { calcPlayerMaxHp } from '../gameLogic';
@@ -7,6 +7,36 @@ export function CombatScreen() {
   const { state, dispatch } = useGame();
   const { battle } = state;
   const logRef = useRef<HTMLDivElement>(null);
+
+  const [playerHit, setPlayerHit] = useState(false);
+  const [enemyHit, setEnemyHit] = useState(false);
+  const [activeSkillId, setActiveSkillId] = useState<string | null>(null);
+  const prevPlayerHpRef = useRef<number | null>(null);
+  const prevEnemyHpRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!battle) return;
+    const prevPlayerHp = prevPlayerHpRef.current;
+    const prevEnemyHp = prevEnemyHpRef.current;
+
+    if (prevPlayerHp !== null && battle.player.stats.hp < prevPlayerHp) {
+      setPlayerHit(true);
+      const t = setTimeout(() => setPlayerHit(false), 500);
+      prevPlayerHpRef.current = battle.player.stats.hp;
+      prevEnemyHpRef.current = battle.enemy.currentHp;
+      return () => clearTimeout(t);
+    }
+    if (prevEnemyHp !== null && battle.enemy.currentHp < prevEnemyHp) {
+      setEnemyHit(true);
+      const t = setTimeout(() => setEnemyHit(false), 500);
+      prevPlayerHpRef.current = battle.player.stats.hp;
+      prevEnemyHpRef.current = battle.enemy.currentHp;
+      return () => clearTimeout(t);
+    }
+
+    prevPlayerHpRef.current = battle.player.stats.hp;
+    prevEnemyHpRef.current = battle.enemy.currentHp;
+  }, [battle?.player.stats.hp, battle?.enemy.currentHp]);
 
   useEffect(() => {
     if (logRef.current) {
@@ -46,7 +76,7 @@ export function CombatScreen() {
       <div className="card">
         <div className="combat-header">
           {/* Player */}
-          <div>
+          <div className={playerHit ? 'combat-hit-flash' : ''}>
             <div className="text-bold" style={{ marginBottom: '6px' }}>
               {player.name} {player.isInMode && <span className="mode-active">⚡</span>}
             </div>
@@ -89,7 +119,7 @@ export function CombatScreen() {
           <div className="vs-text">VS</div>
 
           {/* Enemy */}
-          <div style={{ textAlign: 'right' }}>
+          <div style={{ textAlign: 'right' }} className={enemyHit ? 'combat-hit-flash' : ''}>
             <div className="text-bold" style={{ marginBottom: '6px' }}>
               {enemy.definition.name}
               {enemy.statusEffects.find(e => e.type === 'BURN') && <span className="text-red"> 🔥</span>}
@@ -144,9 +174,13 @@ export function CombatScreen() {
               return (
                 <button
                   key={skill.id}
-                  className="btn"
+                  className={`btn${activeSkillId === skill.id ? ' skill-active' : ''}`}
                   disabled={!canAct || !!onCd || noMd || noHp || tooLowLevel}
-                  onClick={() => dispatch({ type: 'BATTLE_SKILL', skillId: skill.id })}
+                  onClick={() => {
+                    setActiveSkillId(skill.id);
+                    setTimeout(() => setActiveSkillId(null), 600);
+                    dispatch({ type: 'BATTLE_SKILL', skillId: skill.id });
+                  }}
                   title={skill.description}
                 >
                   ✨ {skill.name}
