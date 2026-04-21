@@ -1,10 +1,6 @@
 import { useGame } from '../gameStore';
-import { BLOODLINES, EXP_PER_LEVEL, getLevelCapForRank, RANK_DISPLAY, SKILLS } from '../constants';
+import { BLOODLINES, ELEMENT_EMOJI, EXP_PER_LEVEL, getLevelCapForRank, RANK_DISPLAY, SKILLS } from '../constants';
 import { calcMdRegen, calcPlayerAtk, calcPlayerDef, calcPlayerMaxHp, calcPlayerSpd, getSkillMasteryLevel, getEffectiveSkill } from '../gameLogic';
-
-const ELEMENT_EMOJI: Record<string, string> = {
-  FIRE: '🔥', WATER: '💧', LIGHTNING: '⚡', EARTH: '🌍', WIND: '🌀',
-};
 
 export function StatusScreen() {
   const { state, dispatch } = useGame();

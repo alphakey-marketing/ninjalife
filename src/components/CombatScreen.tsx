@@ -1,11 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGame } from '../gameStore';
-import { BLOODLINES, ITEMS, QUESTS, SKILLS } from '../constants';
+import { BLOODLINES, ELEMENT_EMOJI, ITEMS, QUESTS, SKILLS } from '../constants';
 import { calcPlayerMaxHp, getSkillMasteryLevel, getEffectiveSkill } from '../gameLogic';
-
-const ELEMENT_EMOJI: Record<string, string> = {
-  FIRE: '🔥', WATER: '💧', LIGHTNING: '⚡', EARTH: '🌍', WIND: '🌀',
-};
 
 export function CombatScreen() {
   const { state, dispatch } = useGame();

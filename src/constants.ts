@@ -1,4 +1,4 @@
-import type { BloodlineDefinition, EnemyDefinition, GearDefinition, ItemDefinition, ModeConfig, QuestDefinition, RankDefinition, Rank, SkillDefinition, SpinConfig, SkillEffectNumbers } from './types';
+import type { BloodlineDefinition, Element, EnemyDefinition, GearDefinition, ItemDefinition, ModeConfig, QuestDefinition, RankDefinition, Rank, SkillDefinition, SpinConfig, SkillEffectNumbers } from './types';
 
 // Save version history:
 // 1 → 2: Added completedQuestIds, freeRestUsedToday
@@ -1002,4 +1002,8 @@ export const SKILL_TIERS: Record<string, { kai?: SkillTierDefinition; ougi?: Ski
       mdCost: 35,
     },
   },
+};
+
+export const ELEMENT_EMOJI: Record<Element, string> = {
+  FIRE: '🔥', WATER: '💧', LIGHTNING: '⚡', EARTH: '🌍', WIND: '🌀',
 };
