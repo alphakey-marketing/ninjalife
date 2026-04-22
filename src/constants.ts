@@ -1,4 +1,4 @@
-import type { BloodlineDefinition, Element, EnemyDefinition, GearDefinition, ItemDefinition, ModeConfig, QuestDefinition, RankDefinition, Rank, SkillDefinition, SpinConfig, SkillEffectNumbers } from './types';
+import type { BloodlineDefinition, Element, EnemyDefinition, GearDefinition, ItemDefinition, ModeConfig, QuestDefinition, RankDefinition, Rank, SkillDefinition, SpinConfig, SkillEffectNumbers, WorldZoneDefinition, WorldBossDefinition } from './types';
 
 // Save version history:
 // 1 → 2: Added completedQuestIds, freeRestUsedToday
@@ -7,7 +7,8 @@ import type { BloodlineDefinition, Element, EnemyDefinition, GearDefinition, Ite
 // 4 → 5: Added gear system (ownedGearIds, equippedGear), lastStaminaRecovery
 // 5 → 6: Added skillMasteries on player; element on bloodlines/enemies
 // 6 → 7: Replaced lastFreeRestDate with lastFreeRestTimestamp; added lastVitalRecovery for passive HP/Chakra regen
-export const SAVE_VERSION = 7;
+// 7 → 8: Added killStreak, lastWorldBossKills on player; pendingDrops, isWorldBoss, targetCount on battle; WorldMap feature
+export const SAVE_VERSION = 8;
 export const MD_REGEN_BASE = 5;
 export const MAX_STAMINA = 100;
 export const STAMINA_REST_FREE = 50;
@@ -471,6 +472,34 @@ export const ENEMIES: Record<string, EnemyDefinition> = {
     specialAbility: 'GUARD',
     specialAbilityChance: 0.25,
   },
+  // ── Zone enemies ──────────────────────────────────────────────────────────
+  ZONE_ROGUE: { id: 'ZONE_ROGUE', name: '脱走（だっそう）忍者（にんじゃ）', description: '木ノ葉から逃げ出した脱走忍者。', stats: { maxHp: 80, atk: 18, def: 8, spd: 8 }, element: 'WIND' as Element },
+  ZONE_SENTRY: { id: 'ZONE_SENTRY', name: '門番（もんばん）忍者（にんじゃ）', description: '村の境界を見張る見習い番兵。', stats: { maxHp: 90, atk: 15, def: 12, spd: 6 } },
+  ZONE_ELITE_OUTSKIRTS: { id: 'ZONE_ELITE_OUTSKIRTS', name: '精鋭（せいえい）境界（きょうかい）忍者（にんじゃ）', description: '郊外を守る精鋭忍者。', stats: { maxHp: 140, atk: 28, def: 16, spd: 12 }, element: 'WIND' as Element, specialAbility: 'CHARGE' as const, specialAbilityChance: 0.3 },
+  ZONE_SAND_SCOUT: { id: 'ZONE_SAND_SCOUT', name: '砂隠（すながくれ）の斥候（せっこう）', description: '砂漠の偵察忍者。', stats: { maxHp: 100, atk: 22, def: 10, spd: 10 }, element: 'EARTH' as Element },
+  ZONE_PUPPET_SOLDIER: { id: 'ZONE_PUPPET_SOLDIER', name: '傀儡兵（くぐつへい）', description: '砂隠れの傀儡師が操る兵器。', stats: { maxHp: 120, atk: 25, def: 18, spd: 7 }, specialAbility: 'GUARD' as const, specialAbilityChance: 0.25 },
+  ZONE_SCORPION: { id: 'ZONE_SCORPION', name: '毒蠍（どくさそり）の刺客（しかく）', description: '砂漠の毒を使う刺客。', stats: { maxHp: 110, atk: 28, def: 12, spd: 12 }, element: 'EARTH' as Element, specialAbility: 'DEBUFF' as const, specialAbilityChance: 0.35 },
+  ZONE_SAND_JOUNIN: { id: 'ZONE_SAND_JOUNIN', name: '砂隠（すながくれ）の上忍（じょうにん）', description: '砂の国の上忍。', stats: { maxHp: 150, atk: 32, def: 20, spd: 11 }, element: 'EARTH' as Element },
+  ZONE_ELITE_DESERT: { id: 'ZONE_ELITE_DESERT', name: '砂漠（さばく）の精鋭（せいえい）守護者（しゅごしゃ）', description: '砂漠を守る精鋭上忍。', stats: { maxHp: 200, atk: 40, def: 24, spd: 14 }, element: 'EARTH' as Element, specialAbility: 'CHARGE' as const, specialAbilityChance: 0.3 },
+  ZONE_MIST_HUNTER: { id: 'ZONE_MIST_HUNTER', name: '霧隠（きりがくれ）の暗殺者（あんさつしゃ）', description: '霧の中から現れる暗殺者。', stats: { maxHp: 130, atk: 35, def: 15, spd: 16 }, element: 'WATER' as Element },
+  ZONE_SHARK_SHINOBI: { id: 'ZONE_SHARK_SHINOBI', name: '鮫肌（さめはだ）の忍者（にんじゃ）', description: '鮫のような皮膚を持つ忍者。', stats: { maxHp: 160, atk: 38, def: 22, spd: 13 }, element: 'WATER' as Element, specialAbility: 'HEAL' as const, specialAbilityChance: 0.25 },
+  ZONE_SEA_GUARD: { id: 'ZONE_SEA_GUARD', name: '海岸（かいがん）守衛（しゅえい）', description: '海岸線を守る霧隠れの忍者。', stats: { maxHp: 145, atk: 30, def: 25, spd: 10 }, element: 'WATER' as Element, specialAbility: 'GUARD' as const, specialAbilityChance: 0.3 },
+  ZONE_MIST_ELITE: { id: 'ZONE_MIST_ELITE', name: '霧隠（きりがくれ）精鋭（せいえい）七人衆（しちにんしゅう）', description: '霧隠れの七人衆のメンバー。', stats: { maxHp: 180, atk: 42, def: 20, spd: 17 }, element: 'WATER' as Element, specialAbility: 'MULTI_HIT' as const, specialAbilityChance: 0.35 },
+  ZONE_ELITE_COAST: { id: 'ZONE_ELITE_COAST', name: '霧刃（きりは）の精鋭（せいえい）剣士（けんし）', description: '海岸の精鋭剣士。', stats: { maxHp: 250, atk: 50, def: 28, spd: 18 }, element: 'WATER' as Element, specialAbility: 'MULTI_HIT' as const, specialAbilityChance: 0.4 },
+  ZONE_TEMPLE_GUARD: { id: 'ZONE_TEMPLE_GUARD', name: '神殿（じんでん）守護忍（しゅごにん）', description: '古代神殿を守る封印術士。', stats: { maxHp: 200, atk: 45, def: 30, spd: 12 }, element: 'FIRE' as Element },
+  ZONE_FIRE_PRIEST: { id: 'ZONE_FIRE_PRIEST', name: '火遁（かとん）の司祭（しさい）', description: '神殿の火遁使い。', stats: { maxHp: 180, atk: 52, def: 20, spd: 14 }, element: 'FIRE' as Element, specialAbility: 'CHARGE' as const, specialAbilityChance: 0.35 },
+  ZONE_CURSED_WARRIOR: { id: 'ZONE_CURSED_WARRIOR', name: '呪印（じゅいん）戦士（せんし）', description: '呪印に狂わされた戦士。', stats: { maxHp: 220, atk: 55, def: 25, spd: 13 }, specialAbility: 'CHARGE' as const, specialAbilityChance: 0.4 },
+  ZONE_ELITE_TEMPLE: { id: 'ZONE_ELITE_TEMPLE', name: '神殿（じんでん）の封印（ふういん）術師（じゅつし）', description: '神殿の封印を守る精鋭術師。', stats: { maxHp: 320, atk: 65, def: 38, spd: 16 }, element: 'FIRE' as Element, specialAbility: 'HEAL' as const, specialAbilityChance: 0.3 },
+  ZONE_CLOUD_PATROL: { id: 'ZONE_CLOUD_PATROL', name: '雲隠（くもがくれ）の巡回（じゅんかい）忍者（にんじゃ）', description: '雲隠れ山脈を巡回する上忍。', stats: { maxHp: 260, atk: 62, def: 40, spd: 20 }, element: 'LIGHTNING' as Element },
+  ZONE_THUNDER_MONK: { id: 'ZONE_THUNDER_MONK', name: '雷遁（らいとん）の修行僧（しゅぎょうそう）', description: '山で修行する雷遁の達人。', stats: { maxHp: 240, atk: 68, def: 35, spd: 22 }, element: 'LIGHTNING' as Element, specialAbility: 'CHARGE' as const, specialAbilityChance: 0.35 },
+  ZONE_LIGHTNING_CLONE: { id: 'ZONE_LIGHTNING_CLONE', name: '雷影（らいかげ）の分身（ぶんしん）', description: '雷影が放った影分身。', stats: { maxHp: 280, atk: 72, def: 38, spd: 25 }, element: 'LIGHTNING' as Element, specialAbility: 'MULTI_HIT' as const, specialAbilityChance: 0.4 },
+  ZONE_ELITE_MOUNTAINS: { id: 'ZONE_ELITE_MOUNTAINS', name: '雷神（らいじん）の守護者（しゅごしゃ）', description: '雷神の側近。山の最強守護者。', stats: { maxHp: 400, atk: 85, def: 50, spd: 26 }, element: 'LIGHTNING' as Element, specialAbility: 'MULTI_HIT' as const, specialAbilityChance: 0.45 },
+  // ── Boss enemies ──────────────────────────────────────────────────────────
+  BOSS_GATE_TIGER_ENEMY: { id: 'BOSS_GATE_TIGER_ENEMY', name: '守門虎將（しゅもんこしょう）', description: '木ノ葉の門を守る巨大な虎の将軍。', stats: { maxHp: 300, atk: 42, def: 25, spd: 15 }, specialAbility: 'CHARGE' as const, specialAbilityChance: 0.4 },
+  BOSS_PUPPET_MASTER_ENEMY: { id: 'BOSS_PUPPET_MASTER_ENEMY', name: '砂漠傀儡師（さばくくぐつし）', description: '百体の傀儡を操る砂漠の魔術師。', stats: { maxHp: 380, atk: 50, def: 30, spd: 12 }, element: 'EARTH' as Element, specialAbility: 'MULTI_HIT' as const, specialAbilityChance: 0.45 },
+  BOSS_DEMON_SHARK_ENEMY: { id: 'BOSS_DEMON_SHARK_ENEMY', name: '鬼鮫（おにざめ）', description: '霧の中に潜む伝説の鬼鮫。攻撃力が極めて高い。', stats: { maxHp: 520, atk: 70, def: 35, spd: 22 }, element: 'WATER' as Element, specialAbility: 'MULTI_HIT' as const, specialAbilityChance: 0.45 },
+  BOSS_NINE_TAILS_ENEMY: { id: 'BOSS_NINE_TAILS_ENEMY', name: '九尾分身（きゅうびぶんしん）', description: '九尾の狐の力の一部が具現化した分身。', stats: { maxHp: 680, atk: 85, def: 40, spd: 20 }, element: 'FIRE' as Element, specialAbility: 'CHARGE' as const, specialAbilityChance: 0.5 },
+  BOSS_THUNDER_GOD_ENEMY: { id: 'BOSS_THUNDER_GOD_ENEMY', name: '雷神（らいじん）', description: '雲隠れの山に宿る雷の神。伝説の強さを持つ。', stats: { maxHp: 900, atk: 105, def: 55, spd: 30 }, element: 'LIGHTNING' as Element, specialAbility: 'MULTI_HIT' as const, specialAbilityChance: 0.5 },
 };
 
 export const QUESTS: QuestDefinition[] = [
@@ -1017,3 +1046,153 @@ export const SKILL_TIERS: Record<string, { kai?: SkillTierDefinition; ougi?: Ski
 export const ELEMENT_EMOJI: Record<Element, string> = {
   FIRE: '🔥', WATER: '💧', LIGHTNING: '⚡', EARTH: '🌍', WIND: '🌀',
 };
+
+export const WORLD_ZONES: WorldZoneDefinition[] = [
+  {
+    id: 'ZONE_OUTSKIRTS',
+    name: '木ノ葉（このは）村郊外（むらこうがい）',
+    emoji: '🌿',
+    requiredRank: 'E',
+    requiredLevel: 1,
+    staminaCost: 3,
+    description: '木ノ葉の外れ。野生の獣や脱走忍者が出没する。',
+    enemyIds: ['TRAINING_DUMMY', 'FOREST_WOLF', 'BANDIT_CHIEF', 'ZONE_ROGUE', 'ZONE_SENTRY'],
+    eliteEnemyId: 'ZONE_ELITE_OUTSKIRTS',
+    bossId: 'BOSS_GATE_TIGER',
+  },
+  {
+    id: 'ZONE_DESERT',
+    name: '風之國（かぜのくに）砂漠（さばく）',
+    emoji: '🏜',
+    requiredRank: 'E',
+    requiredLevel: 10,
+    staminaCost: 4,
+    description: '砂嵐が吹き荒れる風の国の荒野。砂隠れの残党が潜む。',
+    enemyIds: ['ZONE_SAND_SCOUT', 'ZONE_PUPPET_SOLDIER', 'ZONE_SCORPION', 'ZONE_SAND_JOUNIN', 'SAND_PUPPETEER'],
+    eliteEnemyId: 'ZONE_ELITE_DESERT',
+    bossId: 'BOSS_PUPPET_MASTER',
+  },
+  {
+    id: 'ZONE_COAST',
+    name: '霧隠（きりがくれ）村海岸（むらかいがん）',
+    emoji: '🌊',
+    requiredRank: 'D',
+    requiredLevel: 1,
+    staminaCost: 5,
+    description: '霧に包まれた海岸線。霧隠れの刺客が漂う。',
+    enemyIds: ['ZONE_MIST_HUNTER', 'ZONE_SHARK_SHINOBI', 'ZONE_SEA_GUARD', 'ZONE_MIST_ELITE', 'ROGUE_SHINOBI'],
+    eliteEnemyId: 'ZONE_ELITE_COAST',
+    bossId: 'BOSS_DEMON_SHARK',
+  },
+  {
+    id: 'ZONE_TEMPLE',
+    name: '火之國（ひのくに）神殿（じんでん）',
+    emoji: '🏯',
+    requiredRank: 'D',
+    requiredLevel: 20,
+    staminaCost: 6,
+    description: '古代の火の国神殿。封印された術士が目覚めようとしている。',
+    enemyIds: ['ZONE_TEMPLE_GUARD', 'ZONE_FIRE_PRIEST', 'ZONE_CURSED_WARRIOR', 'CURSED_SEAL_USER', 'AKATSUKI_MEMBER'],
+    eliteEnemyId: 'ZONE_ELITE_TEMPLE',
+    bossId: 'BOSS_NINE_TAILS_AVATAR',
+  },
+  {
+    id: 'ZONE_MOUNTAINS',
+    name: '雲隠（くもがくれ）村山脈（むらさんみゃく）',
+    emoji: '⛰',
+    requiredRank: 'C',
+    requiredLevel: 1,
+    staminaCost: 8,
+    description: '雷雲が立ち込める雲隠れの山脈。雷神が住む最終秘境。',
+    enemyIds: ['ZONE_CLOUD_PATROL', 'ZONE_THUNDER_MONK', 'ZONE_LIGHTNING_CLONE', 'ANBU_CAPTAIN', 'LEGENDARY_NINJA'],
+    eliteEnemyId: 'ZONE_ELITE_MOUNTAINS',
+    bossId: 'BOSS_THUNDER_GOD',
+  },
+];
+
+export const WORLD_BOSSES: WorldBossDefinition[] = [
+  {
+    id: 'BOSS_GATE_TIGER',
+    name: '守門虎將（しゅもんこしょう）',
+    emoji: '🐯',
+    tier: 'ZONE',
+    cooldownMs: 30 * 60 * 1000,
+    enemyId: 'BOSS_GATE_TIGER_ENEMY',
+    guaranteedDrops: ['SMALL_POTION', 'CHAKRA_PILL'],
+    signatureBloodlineId: undefined,
+  },
+  {
+    id: 'BOSS_PUPPET_MASTER',
+    name: '砂漠傀儡師（さばくくぐつし）',
+    emoji: '🎭',
+    tier: 'ZONE',
+    cooldownMs: 30 * 60 * 1000,
+    enemyId: 'BOSS_PUPPET_MASTER_ENEMY',
+    guaranteedDrops: ['SMALL_POTION', 'ATK_SCROLL'],
+  },
+  {
+    id: 'BOSS_DEMON_SHARK',
+    name: '鬼鮫（おにざめ）',
+    emoji: '🦈',
+    tier: 'WORLD',
+    cooldownMs: 2 * 60 * 60 * 1000,
+    enemyId: 'BOSS_DEMON_SHARK_ENEMY',
+    guaranteedDrops: ['CHAKRA_PILL', 'ATK_SCROLL'],
+    signatureBloodlineId: 'MIST',
+  },
+  {
+    id: 'BOSS_NINE_TAILS_AVATAR',
+    name: '九尾分身（きゅうびぶんしん）',
+    emoji: '🦊',
+    tier: 'WORLD',
+    cooldownMs: 2 * 60 * 60 * 1000,
+    enemyId: 'BOSS_NINE_TAILS_ENEMY',
+    guaranteedDrops: ['STAMINA_PILL', 'ATK_SCROLL'],
+    signatureBloodlineId: 'VOID',
+  },
+  {
+    id: 'BOSS_THUNDER_GOD',
+    name: '雷神（らいじん）',
+    emoji: '⚡',
+    tier: 'LEGENDARY',
+    cooldownMs: 8 * 60 * 60 * 1000,
+    enemyId: 'BOSS_THUNDER_GOD_ENEMY',
+    guaranteedDrops: ['STAMINA_PILL', 'ATK_SCROLL', 'CHAKRA_PILL'],
+    signatureBloodlineId: 'STORM',
+  },
+];
+
+export const ENEMY_DROP_TABLES: Record<string, { itemId: string; chance: number }[]> = {
+  TRAINING_DUMMY:    [],
+  FOREST_WOLF:       [{ itemId: 'SMALL_POTION', chance: 0.15 }],
+  BANDIT_CHIEF:      [{ itemId: 'SMALL_POTION', chance: 0.2 }, { itemId: 'CHAKRA_PILL', chance: 0.1 }],
+  ELITE_NINJA:       [{ itemId: 'SMALL_POTION', chance: 0.25 }, { itemId: 'ATK_SCROLL', chance: 0.1 }],
+  MOUNTAIN_BEAR:     [{ itemId: 'SMALL_POTION', chance: 0.2 }, { itemId: 'STAMINA_PILL', chance: 0.1 }],
+  TEMPLE_MONK:       [{ itemId: 'CHAKRA_PILL', chance: 0.2 }, { itemId: 'ATK_SCROLL', chance: 0.1 }],
+  GUARDIAN:          [{ itemId: 'SMALL_POTION', chance: 0.3 }, { itemId: 'ATK_SCROLL', chance: 0.15 }],
+  ZONE_ROGUE:        [{ itemId: 'SMALL_POTION', chance: 0.2 }],
+  ZONE_SENTRY:       [{ itemId: 'SMALL_POTION', chance: 0.15 }],
+  ZONE_ELITE_OUTSKIRTS: [{ itemId: 'SMALL_POTION', chance: 0.35 }, { itemId: 'ATK_SCROLL', chance: 0.2 }],
+  ZONE_SAND_SCOUT:   [{ itemId: 'CHAKRA_PILL', chance: 0.2 }],
+  ZONE_PUPPET_SOLDIER: [{ itemId: 'SMALL_POTION', chance: 0.2 }, { itemId: 'CHAKRA_PILL', chance: 0.15 }],
+  ZONE_SCORPION:     [{ itemId: 'CHAKRA_PILL', chance: 0.25 }, { itemId: 'ATK_SCROLL', chance: 0.1 }],
+  ZONE_SAND_JOUNIN:  [{ itemId: 'SMALL_POTION', chance: 0.25 }, { itemId: 'STAMINA_PILL', chance: 0.15 }],
+  ZONE_ELITE_DESERT: [{ itemId: 'SMALL_POTION', chance: 0.4 }, { itemId: 'ATK_SCROLL', chance: 0.2 }, { itemId: 'STAMINA_PILL', chance: 0.15 }],
+  ZONE_MIST_HUNTER:  [{ itemId: 'CHAKRA_PILL', chance: 0.25 }],
+  ZONE_SHARK_SHINOBI:[{ itemId: 'SMALL_POTION', chance: 0.25 }, { itemId: 'CHAKRA_PILL', chance: 0.2 }],
+  ZONE_SEA_GUARD:    [{ itemId: 'SMALL_POTION', chance: 0.2 }, { itemId: 'STAMINA_PILL', chance: 0.15 }],
+  ZONE_MIST_ELITE:   [{ itemId: 'CHAKRA_PILL', chance: 0.3 }, { itemId: 'ATK_SCROLL', chance: 0.2 }],
+  ZONE_ELITE_COAST:  [{ itemId: 'SMALL_POTION', chance: 0.4 }, { itemId: 'CHAKRA_PILL', chance: 0.3 }, { itemId: 'ATK_SCROLL', chance: 0.2 }],
+  ZONE_TEMPLE_GUARD: [{ itemId: 'SMALL_POTION', chance: 0.3 }, { itemId: 'STAMINA_PILL', chance: 0.2 }],
+  ZONE_FIRE_PRIEST:  [{ itemId: 'CHAKRA_PILL', chance: 0.3 }, { itemId: 'ATK_SCROLL', chance: 0.15 }],
+  ZONE_CURSED_WARRIOR: [{ itemId: 'SMALL_POTION', chance: 0.35 }, { itemId: 'ATK_SCROLL', chance: 0.2 }],
+  ZONE_ELITE_TEMPLE: [{ itemId: 'SMALL_POTION', chance: 0.5 }, { itemId: 'ATK_SCROLL', chance: 0.3 }, { itemId: 'STAMINA_PILL', chance: 0.2 }],
+  ZONE_CLOUD_PATROL: [{ itemId: 'CHAKRA_PILL', chance: 0.3 }],
+  ZONE_THUNDER_MONK: [{ itemId: 'CHAKRA_PILL', chance: 0.3 }, { itemId: 'ATK_SCROLL', chance: 0.2 }],
+  ZONE_LIGHTNING_CLONE: [{ itemId: 'CHAKRA_PILL', chance: 0.35 }, { itemId: 'STAMINA_PILL', chance: 0.2 }],
+  ZONE_ELITE_MOUNTAINS: [{ itemId: 'CHAKRA_PILL', chance: 0.5 }, { itemId: 'ATK_SCROLL', chance: 0.3 }, { itemId: 'STAMINA_PILL', chance: 0.25 }],
+};
+
+export const KILL_STREAK_BONUS_RYO = 30;
+export const KILL_STREAK_THRESHOLD = 10;
+

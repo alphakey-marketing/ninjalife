@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useGame } from '../gameStore';
 import { BLOODLINES, ELEMENT_EMOJI, ITEMS, QUESTS, SKILLS } from '../constants';
 import { calcPlayerMaxHp, getSkillMasteryLevel, getEffectiveSkill } from '../gameLogic';
+import { renderRuby } from '../utils/renderRuby';
 
 export function CombatScreen() {
   const { state, dispatch } = useGame();
@@ -46,7 +47,8 @@ export function CombatScreen() {
   }
 
   const { player, enemy } = battle;
-  const quest = QUESTS.find(q => q.id === battle.questId)!;
+  const isSynthetic = battle.questId.startsWith('__');
+  const quest = isSynthetic ? null : QUESTS.find(q => q.id === battle.questId) ?? null;
   const maxHp = calcPlayerMaxHp(player);
   const hpPct = Math.max(0, Math.min(100, (player.stats.hp / maxHp) * 100));
   const mdPct = Math.max(0, Math.min(100, (player.stats.md / player.stats.maxMd) * 100));
@@ -63,9 +65,9 @@ export function CombatScreen() {
   return (
     <div className="screen">
       <div className="header-bar">
-        <span className="text-gold">{quest.name}</span>
+        <span className="text-gold">{quest?.name ?? (battle.isWorldBoss ? 'ボス戦' : 'ゾーン探索')}</span>
         <span className="text-small text-gray">
-          {battle.enemiesDefeated}/{quest.targetCount} <ruby>撃破<rt>げきは</rt></ruby> | ターン {battle.turnNumber}
+          {battle.enemiesDefeated}/{battle.targetCount} <ruby>撃破<rt>げきは</rt></ruby> | ターン {battle.turnNumber}
         </span>
       </div>
 
@@ -118,7 +120,7 @@ export function CombatScreen() {
           {/* Enemy */}
           <div style={{ textAlign: 'right' }} className={enemyHit ? 'combat-hit-flash' : ''}>
             <div className="text-bold" style={{ marginBottom: '6px' }}>
-              {enemy.definition.name}
+              {renderRuby(enemy.definition.name)}
               {enemy.definition.element && <span className="text-small"> {ELEMENT_EMOJI[enemy.definition.element]}</span>}
               {enemy.statusEffects.find(e => e.type === 'BURN') && <span className="text-red"> 🔥</span>}
               {enemy.isGuarding && <span className="text-blue"> 🛡</span>}
@@ -219,7 +221,7 @@ export function CombatScreen() {
       {isVictory && !isQuestComplete && (
         <div className="card">
           <div className="text-bold text-gold" style={{ marginBottom: '8px' }}>
-            ✓ <ruby>敵<rt>てき</rt></ruby>を<ruby>倒<rt>たお</rt></ruby>した！({battle.enemiesDefeated + 1}/{quest.targetCount})
+            ✓ <ruby>敵<rt>てき</rt></ruby>を<ruby>倒<rt>たお</rt></ruby>した！({battle.enemiesDefeated + 1}/{battle.targetCount})
           </div>
           <button className="btn btn-primary" onClick={() => dispatch({ type: 'BATTLE_NEXT_ENEMY' })}>
             <ruby>次<rt>つぎ</rt></ruby>の<ruby>敵<rt>てき</rt></ruby> →
@@ -233,12 +235,30 @@ export function CombatScreen() {
           <div className="text-bold text-gold" style={{ marginBottom: '8px' }}>
             🏆 ミッション<ruby>完了<rt>かんりょう</rt></ruby>！
           </div>
-          <div className="text-small" style={{ marginBottom: '8px' }}>
-            <ruby>報酬<rt>ほうしゅう</rt></ruby>：+{quest.reward.exp} EXP, +{quest.reward.ryo} Ryo
-          </div>
-          <button className="btn btn-success" onClick={() => dispatch({ type: 'COLLECT_QUEST_REWARD' })}>
-            <ruby>報酬<rt>ほうしゅう</rt></ruby>を<ruby>受<rt>う</rt></ruby>け<ruby>取<rt>と</rt></ruby>る
-          </button>
+          {quest && (
+            <div className="text-small" style={{ marginBottom: '8px' }}>
+              <ruby>報酬<rt>ほうしゅう</rt></ruby>：+{quest.reward.exp} EXP, +{quest.reward.ryo} Ryo
+            </div>
+          )}
+          {battle.pendingDrops && battle.pendingDrops.length > 0 && (
+            <div style={{ marginBottom: '8px' }}>
+              <div className="text-small text-gold" style={{ marginBottom: '4px' }}>🎁 ドロップ:</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                {battle.pendingDrops.map((drop, i) => (
+                  <span key={i} className="buff-badge">{drop.label}</span>
+                ))}
+              </div>
+            </div>
+          )}
+          {isSynthetic ? (
+            <button className="btn btn-success" onClick={() => dispatch({ type: 'COLLECT_DROPS' })}>
+              🎁 ドロップを<ruby>受<rt>う</rt></ruby>け<ruby>取<rt>と</rt></ruby>る
+            </button>
+          ) : (
+            <button className="btn btn-success" onClick={() => dispatch({ type: 'COLLECT_QUEST_REWARD' })}>
+              <ruby>報酬<rt>ほうしゅう</rt></ruby>を<ruby>受<rt>う</rt></ruby>け<ruby>取<rt>と</rt></ruby>る
+            </button>
+          )}
         </div>
       )}
 

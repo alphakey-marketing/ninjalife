@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import type { BattleState, PlayerState, Screen } from './types';
-import { ENEMIES, GEAR, ITEMS, QUESTS, SAVE_VERSION, MAX_STAMINA, STAMINA_RECOVERY_INTERVAL_MS, STAMINA_RECOVERY_AMOUNT, VITAL_REGEN_INTERVAL_MS, VITAL_HP_REGEN_AMOUNT, VITAL_MD_REGEN_AMOUNT } from './constants';
+import type { BattleState, BattleDrop, PlayerState, Screen } from './types';
+import { ENEMIES, GEAR, ITEMS, QUESTS, SAVE_VERSION, MAX_STAMINA, STAMINA_RECOVERY_INTERVAL_MS, STAMINA_RECOVERY_AMOUNT, VITAL_REGEN_INTERVAL_MS, VITAL_HP_REGEN_AMOUNT, VITAL_MD_REGEN_AMOUNT, WORLD_BOSSES, WORLD_ZONES, KILL_STREAK_BONUS_RYO, KILL_STREAK_THRESHOLD } from './constants';
 import {
   applyItemEffect,
   applyStatPoint,
@@ -21,6 +21,9 @@ import {
   performUseItemInBattle,
   toggleMode,
   unequipGear,
+  rollBattleDrops,
+  rollBossDrops,
+  isBossAvailable,
 } from './gameLogic';
 
 interface GameState {
@@ -40,6 +43,9 @@ type GameAction =
   | { type: 'BATTLE_RUN' }
   | { type: 'BATTLE_NEXT_ENEMY' }
   | { type: 'COLLECT_QUEST_REWARD' }
+  | { type: 'COLLECT_DROPS' }
+  | { type: 'ENTER_ZONE'; zoneId: string; enemyId: string }
+  | { type: 'WORLD_BOSS_ATTEMPT'; bossId: string }
   | { type: 'SPIN' }
   | { type: 'EQUIP_BLOODLINE'; bloodlineId: string }
   | { type: 'ALLOCATE_STAT'; stat: 'str' | 'vit' | 'foc' }
@@ -95,6 +101,8 @@ const initialPlayer: PlayerState = {
   ownedGearIds: [],
   equippedGear: { weapon: null, armor: null, accessory: null },
   skillMasteries: {},
+  killStreak: 0,
+  lastWorldBossKills: {},
 };
 
 const initialState: GameState = {
@@ -115,9 +123,11 @@ function autoSave(player: PlayerState): void {
   } catch { /* silent fail */ }
 }
 
-function createBattle(player: PlayerState, questId: string): BattleState {
-  const quest = QUESTS.find(q => q.id === questId)!;
-  const enemyDef = ENEMIES[quest.targetEnemyId];
+function createBattle(player: PlayerState, questId: string, overrideEnemyId?: string, overrideTargetCount?: number, isWorldBoss?: boolean): BattleState {
+  const quest = overrideEnemyId ? null : QUESTS.find(q => q.id === questId);
+  const enemyId = overrideEnemyId ?? quest!.targetEnemyId;
+  const targetCount = overrideTargetCount ?? quest!.targetCount;
+  const enemyDef = ENEMIES[enemyId];
   const battleLog: string[] = [`${enemyDef.name} が現れた！`];
   let initialPlayer = { ...player };
 
@@ -158,8 +168,11 @@ function createBattle(player: PlayerState, questId: string): BattleState {
     phase: 'PLAYER_TURN',
     enemiesDefeated: 0,
     questId,
+    targetCount,
     modeCooldown: 0,
     playerStatusEffects: [],
+    pendingDrops: [],
+    isWorldBoss: isWorldBoss ?? false,
   };
 }
 
@@ -237,8 +250,20 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'BATTLE_NEXT_ENEMY': {
       if (!state.battle || state.battle.phase !== 'VICTORY') return state;
-      const quest = QUESTS.find(q => q.id === state.battle!.questId)!;
+      const isSynthetic = state.battle.questId.startsWith('__');
+      const quest = isSynthetic ? null : QUESTS.find(q => q.id === state.battle!.questId);
+      const targetCount = state.battle.targetCount;
       const newDefeated = state.battle.enemiesDefeated + 1;
+
+      // Roll drops for just-defeated enemy and update kill streak
+      const defeatedEnemyId = state.battle.enemy.definition.id;
+      const newDrops = rollBattleDrops(defeatedEnemyId);
+      const newKillStreak = (state.player.killStreak ?? 0) + 1;
+      const streakBonus: BattleDrop[] = (newKillStreak % KILL_STREAK_THRESHOLD === 0)
+        ? [{ type: 'RYO', ryo: KILL_STREAK_BONUS_RYO, label: `🔥 ${KILL_STREAK_THRESHOLD}連続撃破ボーナス！ +${KILL_STREAK_BONUS_RYO} Ryo` }]
+        : [];
+      const accumulatedDrops = [...(state.battle.pendingDrops ?? []), ...newDrops, ...streakBonus];
+
       // Use state.player as base to avoid snapshot staleness; carry over current battle HP/MD/mode
       const updatedPlayer: PlayerState = {
         ...state.player,
@@ -248,9 +273,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           md: state.battle.player.stats.md,
         },
         isInMode: state.battle.player.isInMode,
+        killStreak: newKillStreak,
       };
 
-      if (newDefeated >= quest.targetCount) {
+      if (newDefeated >= targetCount) {
         return {
           ...state,
           player: updatedPlayer,
@@ -260,11 +286,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             enemiesDefeated: newDefeated,
             phase: 'QUEST_COMPLETE',
             battleLog: [...state.battle.battleLog, 'ミッション完了！報酬を受け取れ。'],
+            pendingDrops: accumulatedDrops,
           },
         };
       }
 
-      const enemyDef = ENEMIES[quest.targetEnemyId];
+      const enemyId = isSynthetic ? state.battle.enemy.definition.id : quest!.targetEnemyId;
+      const enemyDef = ENEMIES[enemyId];
       return {
         ...state,
         player: updatedPlayer,
@@ -284,16 +312,18 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           phase: 'PLAYER_TURN',
           enemiesDefeated: newDefeated,
           playerStatusEffects: state.battle.playerStatusEffects ?? [],
+          pendingDrops: accumulatedDrops,
         },
       };
     }
 
     case 'COLLECT_QUEST_REWARD': {
       if (!state.battle) return state;
-      const quest = QUESTS.find(q => q.id === state.battle!.questId)!;
+      const quest = QUESTS.find(q => q.id === state.battle!.questId);
+      if (!quest) return state; // synthetic quest — use COLLECT_DROPS instead
       // Use state.player as base to avoid snapshot staleness; carry over battle HP only
       const preRewardLevel = state.player.stats.level;
-      let player = { ...state.player };
+      let player = { ...state.player, killStreak: state.player.killStreak ?? 0 };
 
       // Track quest completion
       let completedQuestIds = player.completedQuestIds;
@@ -307,6 +337,28 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
       // UNLIMITED: don't record anything
 
+      // Apply pending drops (items/ryo accumulated during battle)
+      const pendingDrops = state.battle.pendingDrops ?? [];
+      let newInventory = [...(player.inventory ?? [])];
+      let bonusRyo = 0;
+      for (const drop of pendingDrops) {
+        if (drop.type === 'RYO' && drop.ryo) {
+          bonusRyo += drop.ryo;
+        } else if (drop.type === 'ITEM' && drop.itemId) {
+          const existing = newInventory.find(i => i.itemId === drop.itemId);
+          if (existing) {
+            newInventory = newInventory.map(i => i.itemId === drop.itemId ? { ...i, quantity: i.quantity + 1 } : i);
+          } else {
+            newInventory = [...newInventory, { itemId: drop.itemId, quantity: 1 }];
+          }
+        } else if (drop.type === 'BLOODLINE_SCROLL' && drop.bloodlineId) {
+          const already = player.ownedBloodlines.some(b => b.id === drop.bloodlineId);
+          if (!already) {
+            player = { ...player, ownedBloodlines: [...player.ownedBloodlines, { id: drop.bloodlineId!, mastery: 0 }] };
+          }
+        }
+      }
+
       player = {
         ...player,
         stats: {
@@ -316,12 +368,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           hp: state.battle.player.stats.hp,
           md: player.stats.maxMd,
         },
-        ryo: player.ryo + quest.reward.ryo,
+        ryo: player.ryo + quest.reward.ryo + bonusRyo,
         bossDefeatedThisRank: quest.type === 'BOSS' ? true : player.bossDefeatedThisRank,
         currentQuestId: null,
         isInMode: false,
         completedQuestIds,
         questResetTimestamps,
+        inventory: newInventory,
       };
 
       player = checkLevelUp(player);
@@ -331,7 +384,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         screen: 'HUB',
         battle: null,
         player,
-        notifications: [...state.notifications, `ミッション完了！+${quest.reward.exp} EXP +${quest.reward.ryo} Ryo`],
+        notifications: [...state.notifications, `ミッション完了！+${quest.reward.exp} EXP +${quest.reward.ryo} Ryo${bonusRyo > 0 ? ` +${bonusRyo} Ryo (ドロップ)` : ''}`],
       };
 
       // Level-up notifications for each level gained
@@ -343,6 +396,115 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       autoSave(finalState.player);
 
       return finalState;
+    }
+
+    case 'COLLECT_DROPS': {
+      if (!state.battle) return state;
+      const pendingDrops = state.battle.pendingDrops ?? [];
+      let player = { ...state.player };
+      let newInventory = [...(player.inventory ?? [])];
+      let bonusRyo = 0;
+      for (const drop of pendingDrops) {
+        if (drop.type === 'RYO' && drop.ryo) {
+          bonusRyo += drop.ryo;
+        } else if (drop.type === 'ITEM' && drop.itemId) {
+          const existing = newInventory.find(i => i.itemId === drop.itemId);
+          if (existing) {
+            newInventory = newInventory.map(i => i.itemId === drop.itemId ? { ...i, quantity: i.quantity + 1 } : i);
+          } else {
+            newInventory = [...newInventory, { itemId: drop.itemId, quantity: 1 }];
+          }
+        } else if (drop.type === 'BLOODLINE_SCROLL' && drop.bloodlineId) {
+          const already = player.ownedBloodlines.some(b => b.id === drop.bloodlineId);
+          if (!already) {
+            player = { ...player, ownedBloodlines: [...player.ownedBloodlines, { id: drop.bloodlineId!, mastery: 0 }] };
+          }
+        }
+      }
+      // Update boss kill timestamp if world boss
+      let lastWorldBossKills = { ...(player.lastWorldBossKills ?? {}) };
+      if (state.battle.isWorldBoss) {
+        const bossQuestId = state.battle.questId;
+        const bossId = bossQuestId.replace('__BOSS__', '');
+        lastWorldBossKills = { ...lastWorldBossKills, [bossId]: Date.now() };
+      }
+      player = {
+        ...player,
+        ryo: player.ryo + bonusRyo,
+        stats: {
+          ...player.stats,
+          hp: state.battle.player.stats.hp,
+          md: player.stats.maxMd,
+        },
+        currentQuestId: null,
+        isInMode: false,
+        inventory: newInventory,
+        lastWorldBossKills,
+      };
+      player = checkLevelUp(player);
+      const navigateTo: Screen = state.battle.isWorldBoss || state.battle.questId.startsWith('__ZONE__') ? 'MAP' : 'HUB';
+      const dropMsg = pendingDrops.length > 0
+        ? `ドロップ獲得！${bonusRyo > 0 ? ` +${bonusRyo} Ryo` : ''}`
+        : 'ドロップなし';
+      autoSave(player);
+      return notify({ ...state, screen: navigateTo, battle: null, player }, dropMsg);
+    }
+
+    case 'ENTER_ZONE': {
+      const zone = WORLD_ZONES.find(z => z.id === action.zoneId);
+      if (!zone) return notify(state, 'ゾーンが見つかりません！');
+      const rankOrder: Record<string, number> = { E: 0, D: 1, C: 2 };
+      if (rankOrder[zone.requiredRank] > rankOrder[state.player.rank]) {
+        return notify(state, `ランクが足りません！必要: ${zone.requiredRank}`);
+      }
+      if (state.player.stats.level < zone.requiredLevel) {
+        return notify(state, `レベルが足りません！必要: ${zone.requiredLevel}`);
+      }
+      if (state.player.stamina < zone.staminaCost) {
+        return notify(state, `スタミナ不足！必要: ${zone.staminaCost}（現在: ${state.player.stamina}）`);
+      }
+      const enemyDef = ENEMIES[action.enemyId];
+      if (!enemyDef) return notify(state, '敵が見つかりません！');
+      const playerWithStamina = { ...state.player, stamina: state.player.stamina - zone.staminaCost };
+      const questId = `__ZONE__${zone.id}`;
+      const battle = createBattle(playerWithStamina, questId, action.enemyId, 1, false);
+      return {
+        ...state,
+        screen: 'COMBAT',
+        battle,
+        player: { ...playerWithStamina, currentQuestId: questId },
+      };
+    }
+
+    case 'WORLD_BOSS_ATTEMPT': {
+      const boss = WORLD_BOSSES.find(b => b.id === action.bossId);
+      if (!boss) return notify(state, 'ボスが見つかりません！');
+      const lastKills = state.player.lastWorldBossKills ?? {};
+      if (!isBossAvailable(boss.id, lastKills, boss.cooldownMs)) {
+        return notify(state, `${boss.name} はまだ復活していません！`);
+      }
+      // Find zone for stamina cost
+      const zone = WORLD_ZONES.find(z => z.bossId === boss.id);
+      const staminaCost = zone ? zone.staminaCost * 2 : 10;
+      if (state.player.stamina < staminaCost) {
+        return notify(state, `スタミナ不足！必要: ${staminaCost}（現在: ${state.player.stamina}）`);
+      }
+      const enemyDef = ENEMIES[boss.enemyId];
+      if (!enemyDef) return notify(state, 'ボスの敵データが見つかりません！');
+      const playerWithStamina = { ...state.player, stamina: state.player.stamina - staminaCost };
+      const questId = `__BOSS__${boss.id}`;
+      // Roll boss drops now (check if first kill)
+      const isFirstKill = !state.player.lastWorldBossKills?.[boss.id];
+      const bossDrops = rollBossDrops(boss, isFirstKill);
+      const battle = createBattle(playerWithStamina, questId, boss.enemyId, 1, true);
+      // Pre-set boss drops on battle state so they're ready at QUEST_COMPLETE
+      const battleWithDrops = { ...battle, pendingDrops: bossDrops };
+      return {
+        ...state,
+        screen: 'COMBAT',
+        battle: battleWithDrops,
+        player: { ...playerWithStamina, currentQuestId: questId },
+      };
     }
 
     case 'SPIN': {
@@ -518,6 +680,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             ownedGearIds: rawPlayer.ownedGearIds ?? [],
             equippedGear: rawPlayer.equippedGear ?? { weapon: null, armor: null, accessory: null },
             skillMasteries: rawPlayer.skillMasteries ?? {},
+            killStreak: (rawPlayer as PlayerState).killStreak ?? 0,
+            lastWorldBossKills: (rawPlayer as PlayerState).lastWorldBossKills ?? {},
           };
           return notify({ ...state, player, screen: 'HUB', battle: null }, 'ゲームを読み込みました！');
         }
@@ -602,6 +766,8 @@ function tryAutoLoadState(): GameState {
       ownedGearIds: rawPlayer.ownedGearIds ?? [],
       equippedGear: rawPlayer.equippedGear ?? { weapon: null, armor: null, accessory: null },
       skillMasteries: rawPlayer.skillMasteries ?? {},
+      killStreak: (rawPlayer as PlayerState).killStreak ?? 0,
+      lastWorldBossKills: (rawPlayer as PlayerState).lastWorldBossKills ?? {},
     };
     return { screen: 'HUB', player, battle: null, notifications: [], lastSpinBloodlineId: null };
   } catch {

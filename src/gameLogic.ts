@@ -1,5 +1,5 @@
-import { BLOODLINES, CLINIC_COSTS, EXP_PER_LEVEL, FREE_REST_COOLDOWN_MS, GEAR, getLevelCapForRank, ITEMS, MAX_STAMINA, MD_REGEN_BASE, MODE_CONFIG, RARE_BLOODLINE_IDS, SKILL_TIERS, SKILLS, SPIN_CONFIG, STAT_POINTS_PER_LEVEL } from './constants';
-import type { ActiveBuff, BattleState, InventoryItem, PlayerState, QuestDefinition, SkillDefinition } from './types';
+import { BLOODLINES, CLINIC_COSTS, EXP_PER_LEVEL, FREE_REST_COOLDOWN_MS, GEAR, getLevelCapForRank, ITEMS, MAX_STAMINA, MD_REGEN_BASE, MODE_CONFIG, RARE_BLOODLINE_IDS, SKILL_TIERS, SKILLS, SPIN_CONFIG, STAT_POINTS_PER_LEVEL, ENEMY_DROP_TABLES } from './constants';
+import type { ActiveBuff, BattleDrop, BattleState, InventoryItem, PlayerState, QuestDefinition, SkillDefinition, WorldBossDefinition } from './types';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1024,4 +1024,49 @@ export function unequipGear(player: PlayerState, slot: 'WEAPON' | 'ARMOR' | 'ACC
       hp: Math.min(newPlayer.stats.hp, newEffectiveMaxHp),
     },
   };
+}
+
+// ── World Map / Drops ──────────────────────────────────────────────────────
+
+export function rollBattleDrops(enemyId: string): BattleDrop[] {
+  const table = ENEMY_DROP_TABLES[enemyId] ?? [];
+  const drops: BattleDrop[] = [];
+  for (const entry of table) {
+    if (Math.random() < entry.chance) {
+      const item = ITEMS[entry.itemId];
+      drops.push({ type: 'ITEM', itemId: entry.itemId, label: item?.name ?? entry.itemId });
+    }
+  }
+  if (enemyId !== 'TRAINING_DUMMY') {
+    const ryo = 5 + Math.floor(Math.random() * 16);
+    drops.push({ type: 'RYO', ryo, label: `+${ryo} Ryo` });
+  }
+  return drops;
+}
+
+export function rollBossDrops(boss: WorldBossDefinition, isFirstKill: boolean): BattleDrop[] {
+  const drops: BattleDrop[] = boss.guaranteedDrops.map(itemId => {
+    const item = ITEMS[itemId];
+    return { type: 'ITEM' as const, itemId, label: item?.name ?? itemId };
+  });
+  const ryo = 200 + Math.floor(Math.random() * 101);
+  drops.push({ type: 'RYO', ryo, label: `+${ryo} Ryo` });
+  if (isFirstKill && boss.signatureBloodlineId) {
+    const bloodline = BLOODLINES[boss.signatureBloodlineId];
+    const bloodlineName = bloodline?.name ?? boss.signatureBloodlineId;
+    drops.push({ type: 'BLOODLINE_SCROLL', bloodlineId: boss.signatureBloodlineId, label: `血継限界の巻物（${bloodlineName}）` });
+  }
+  return drops;
+}
+
+export function isBossAvailable(bossId: string, lastKills: Record<string, number>, cooldownMs: number): boolean {
+  const lastKill = lastKills[bossId];
+  if (!lastKill) return true;
+  return Date.now() - lastKill >= cooldownMs;
+}
+
+export function bossNextAvailableMs(bossId: string, lastKills: Record<string, number>, cooldownMs: number): number {
+  const lastKill = lastKills[bossId];
+  if (!lastKill) return 0;
+  return Math.max(0, lastKill + cooldownMs - Date.now());
 }

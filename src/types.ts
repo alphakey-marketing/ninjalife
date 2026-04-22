@@ -3,7 +3,7 @@ export type Element = 'FIRE' | 'WATER' | 'LIGHTNING' | 'EARTH' | 'WIND';
 export type QuestType = 'GRIND' | 'ELITE' | 'BOSS';
 export type Rank = 'E' | 'D' | 'C';
 export type ActionType = 'ATTACK' | 'SKILL' | 'TOGGLE_MODE' | 'RUN';
-export type Screen = 'HUB' | 'QUEST' | 'COMBAT' | 'SPIN' | 'STATUS' | 'CLINIC' | 'SHOP' | 'GEAR' | 'INTRO';
+export type Screen = 'HUB' | 'QUEST' | 'COMBAT' | 'SPIN' | 'STATUS' | 'CLINIC' | 'SHOP' | 'GEAR' | 'INTRO' | 'MAP';
 export type QuestRepeatType = 'UNLIMITED' | 'DAILY' | 'ONCE';
 export type GearSlot = 'WEAPON' | 'ARMOR' | 'ACCESSORY';
 export type GearRarity = 'COMMON' | 'RARE' | 'LEGENDARY';
@@ -112,6 +112,8 @@ export interface PlayerState {
   ownedGearIds: string[];
   equippedGear: EquippedGear;
   skillMasteries: Record<string, number>;
+  killStreak: number;
+  lastWorldBossKills: Record<string, number>;
 }
 
 export interface SkillEffectNumbers {
@@ -215,6 +217,39 @@ export interface EnemyDefinition {
   specialAbilityChance?: number;
 }
 
+export interface WorldZoneDefinition {
+  id: string;
+  name: string;
+  emoji: string;
+  requiredRank: Rank;
+  requiredLevel: number;
+  staminaCost: number;
+  description: string;
+  enemyIds: string[];
+  eliteEnemyId: string;
+  bossId: string;
+}
+
+export interface WorldBossDefinition {
+  id: string;
+  name: string;
+  emoji: string;
+  tier: 'ZONE' | 'WORLD' | 'LEGENDARY';
+  cooldownMs: number;
+  enemyId: string;
+  guaranteedDrops: string[];
+  signatureBloodlineId?: string;
+}
+
+export interface BattleDrop {
+  type: 'RYO' | 'ITEM' | 'GEAR' | 'BLOODLINE_SCROLL';
+  ryo?: number;
+  itemId?: string;
+  gearId?: string;
+  bloodlineId?: string;
+  label: string;
+}
+
 export interface RankDefinition {
   rank: Rank;
   nextRank?: Rank;
@@ -255,6 +290,9 @@ export interface BattleState {
   phase: 'PLAYER_TURN' | 'ENEMY_TURN' | 'VICTORY' | 'DEFEAT' | 'QUEST_COMPLETE';
   enemiesDefeated: number;
   questId: string;
+  targetCount: number;
   modeCooldown: number;
   playerStatusEffects: StatusEffect[];
+  pendingDrops: BattleDrop[];
+  isWorldBoss: boolean;
 }

@@ -8,6 +8,7 @@ import { ClinicScreen } from './components/ClinicScreen';
 import { ShopScreen } from './components/ShopScreen';
 import { GearScreen } from './components/GearScreen';
 import { IntroScreen } from './components/IntroScreen';
+import { MapScreen } from './components/MapScreen';
 import './App.css';
 
 function GameContent() {
@@ -28,6 +29,7 @@ function GameContent() {
       {state.screen === 'CLINIC' && <ClinicScreen />}
       {state.screen === 'SHOP' && <ShopScreen />}
       {state.screen === 'GEAR' && <GearScreen />}
+      {state.screen === 'MAP' && <MapScreen />}
     </>
   );
 }

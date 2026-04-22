@@ -54,6 +54,8 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     ownedGearIds: [],
     equippedGear: { weapon: null, armor: null, accessory: null },
     skillMasteries: {},
+    killStreak: 0,
+    lastWorldBossKills: {},
     ...overrides,
   };
 }
@@ -79,8 +81,11 @@ function makeBattle(playerOverrides: Partial<PlayerState> = {}): BattleState {
     phase: 'PLAYER_TURN',
     enemiesDefeated: 0,
     questId: 'GRIND_QUEST',
+    targetCount: 5,
     modeCooldown: 0,
     playerStatusEffects: [],
+    pendingDrops: [],
+    isWorldBoss: false,
   };
 }
 

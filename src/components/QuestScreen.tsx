@@ -1,6 +1,7 @@
 import { useGame } from '../gameStore';
 import { ELEMENT_EMOJI, ENEMIES, QUEST_ZONES, QUESTS } from '../constants';
 import { getTodayString } from '../gameLogic';
+import { renderRuby } from '../utils/renderRuby';
 
 const questTypeLabel: Record<string, string> = {
   GRIND: '⚔ GRIND',
@@ -59,7 +60,7 @@ export function QuestScreen() {
                   <div className="text-small text-gray" style={{ marginTop: '4px' }}>{quest.description}</div>
                   <div className="flex-row text-small" style={{ marginTop: '6px', justifyContent: 'space-between' }}>
                     <span>
-                      {quest.targetCount}体の {enemyDef?.name ?? quest.targetEnemyId}を<ruby>倒<rt>たお</rt></ruby>せ
+                      {quest.targetCount}体の {enemyDef ? renderRuby(enemyDef.name) : quest.targetEnemyId}を<ruby>倒<rt>たお</rt></ruby>せ
                       {enemyDef?.element && <span> {ELEMENT_EMOJI[enemyDef.element]}</span>}
                       {enemyDef?.specialAbility === 'GUARD' && <span className="text-gray"> 🛡</span>}
                       {enemyDef?.specialAbility === 'CHARGE' && <span className="text-gray"> ⚡</span>}
@@ -71,7 +72,7 @@ export function QuestScreen() {
                   </div>
                   <div className="flex-row text-small" style={{ marginTop: '4px', justifyContent: 'space-between' }}>
                     <span className={staminaInsufficient ? 'text-red' : 'text-gray'}>
-                      ⚡ {quest.staminaCost} スタミナ{staminaInsufficient ? '（<ruby>不足<rt>ふそく</rt></ruby>）' : ''}
+                      ⚡ {quest.staminaCost} スタミナ{staminaInsufficient && <span>（<ruby>不足<rt>ふそく</rt></ruby>）</span>}
                     </span>
                   </div>
                   {isLocked && (

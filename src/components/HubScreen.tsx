@@ -156,6 +156,9 @@ export function HubScreen() {
           <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'GEAR' })}>
             🗡 <ruby>装備<rt>そうび</rt></ruby>
           </button>
+          <button className="btn btn-primary" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'MAP' })}>
+            🗺 <ruby>ワールドマップ<rt></rt></ruby>
+          </button>
           {canRankUp(player) && (
             <button className="btn btn-success" onClick={() => dispatch({ type: 'RANK_UP' })}>
               ⬆ <ruby>昇進<rt>しょうしん</rt></ruby>！
