@@ -3,7 +3,6 @@ import type { ActiveBuff, BattleDrop, BattleState, InventoryItem, PlayerState, Q
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/** @deprecated kept for save migration only */
 export function getTodayString(): string {
   return new Date().toISOString().slice(0, 10);
 }
