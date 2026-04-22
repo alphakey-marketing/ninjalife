@@ -43,7 +43,8 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     currentQuestId: null,
     bossDefeatedThisRank: false,
     completedQuestIds: [],
-    lastFreeRestDate: '',
+    lastFreeRestTimestamp: 0,
+    lastVitalRecovery: Date.now(),
     inventory: [],
     activeBuffs: [],
     questResetTimestamps: {},
@@ -427,15 +428,16 @@ describe('performRest (FREE)', () => {
     expect(result.stats.md).toBe(Math.min(50, 10 + Math.floor(50 * 0.5)));
   });
 
-  it('marks lastFreeRestDate after use', () => {
+  it('sets lastFreeRestTimestamp after use', () => {
+    const before = Date.now();
     const player = makePlayer();
     const { player: result } = performRest(player, 'FREE');
-    expect(result.lastFreeRestDate).toBe(getTodayString());
-    expect(result.lastFreeRestDate).not.toBe('');
+    expect(result.lastFreeRestTimestamp).toBeGreaterThanOrEqual(before);
+    expect(result.lastFreeRestTimestamp).not.toBe(0);
   });
 
-  it('fails when free rest already used today', () => {
-    const player = makePlayer({ lastFreeRestDate: getTodayString() });
+  it('fails when free rest on cooldown (within 20 hours)', () => {
+    const player = makePlayer({ lastFreeRestTimestamp: Date.now() - 1000 });
     const { success, player: unchanged } = performRest(player, 'FREE');
     expect(success).toBe(false);
     expect(unchanged).toBe(player);
@@ -874,7 +876,7 @@ describe('getSkillMasteryLevel', () => {
 describe('getEffectiveSkill', () => {
   it('returns base skill at mastery level 1', () => {
     const skill = getEffectiveSkill('BLAZE_SHOT', 1);
-    expect(skill.name).toBe('火遁・豪火球之術');
+    expect(skill.name).toBe('火遁・豪火球の術');
   });
 
   it('returns kai variant at mastery level 2', () => {

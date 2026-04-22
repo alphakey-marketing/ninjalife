@@ -20,6 +20,7 @@ export function SpinScreen() {
   const [isSpinning, setIsSpinning] = useState(false);
   const [spinDisplayIdx, setSpinDisplayIdx] = useState(0);
   const [spinResult, setSpinResult] = useState<string | null>(null);
+  const [resultBloodlineId, setResultBloodlineId] = useState<string | null>(null);
   const [showResultFlash, setShowResultFlash] = useState(false);
   const spinIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevNotificationCount = useRef(state.notifications.length);
@@ -29,6 +30,7 @@ export function SpinScreen() {
   const handleSpin = () => {
     setIsSpinning(true);
     setSpinResult(null);
+    setResultBloodlineId(null);
     setShowResultFlash(false);
     prevNotificationCount.current = state.notifications.length;
 
@@ -59,10 +61,12 @@ export function SpinScreen() {
       setIsSpinning(false);
       const resultMsg = state.notifications[state.notifications.length - 1] ?? '';
       setSpinResult(resultMsg);
+      // Use the actual spin result bloodline from game state
+      setResultBloodlineId(state.lastSpinBloodlineId ?? null);
       setShowResultFlash(true);
       setTimeout(() => setShowResultFlash(false), 1500);
     }
-  }, [state.notifications.length, isSpinning]);
+  }, [state.notifications.length, state.lastSpinBloodlineId, isSpinning]);
 
   useEffect(() => {
     return () => {
@@ -75,9 +79,6 @@ export function SpinScreen() {
     const bonus = rareIds.includes(e.bloodlineId) ? player.rankBonus.spinRarityBonus * 100 : 0;
     return sum + e.baseWeight + bonus;
   }, 0);
-
-  const displayEntry = entries[spinDisplayIdx];
-  const displayBl = BLOODLINES[displayEntry.bloodlineId];
 
   return (
     <div className="screen">
@@ -97,13 +98,20 @@ export function SpinScreen() {
         </div>
 
         {/* Roulette Display */}
-        <div className={`spin-wheel-display ${showResultFlash ? `spin-flash-${displayBl.rarity.toLowerCase()}` : ''}`}>
-          <div className={`rarity-${displayBl.rarity.toLowerCase()} text-bold`} style={{ fontSize: '1.3rem' }}>
-            {rarityEmoji[displayBl.rarity]} {displayBl.name}
-            {displayBl.element && <span> {ELEMENT_EMOJI[displayBl.element]}</span>}
-          </div>
-          <div className="text-small text-gray" style={{ marginTop: '4px' }}>[{displayBl.rarity}]</div>
-        </div>
+        {(() => {
+          const displayBl = resultBloodlineId && !isSpinning
+            ? BLOODLINES[resultBloodlineId]
+            : BLOODLINES[entries[spinDisplayIdx].bloodlineId];
+          return (
+            <div className={`spin-wheel-display ${showResultFlash ? `spin-flash-${displayBl.rarity.toLowerCase()}` : ''}`}>
+              <div className={`rarity-${displayBl.rarity.toLowerCase()} text-bold`} style={{ fontSize: '1.3rem' }}>
+                {rarityEmoji[displayBl.rarity]} {displayBl.name}
+                {displayBl.element && <span> {ELEMENT_EMOJI[displayBl.element]}</span>}
+              </div>
+              <div className="text-small text-gray" style={{ marginTop: '4px' }}>[{displayBl.rarity}]</div>
+            </div>
+          );
+        })()}
 
         {/* Odds Display */}
         <div style={{ marginBottom: '12px' }}>
@@ -138,8 +146,8 @@ export function SpinScreen() {
           {isSpinning ? '�� 回転中（かいてんちゅう）...' : '🌀 ガチャを引く！(100 Ryo)'}
         </button>
 
-        {spinResult && !isSpinning && (
-          <div className={`spin-result ${rarityClass[displayBl.rarity]}`}>
+        {spinResult && !isSpinning && resultBloodlineId && (
+          <div className={`spin-result ${rarityClass[BLOODLINES[resultBloodlineId].rarity]}`}>
             {spinResult}
           </div>
         )}

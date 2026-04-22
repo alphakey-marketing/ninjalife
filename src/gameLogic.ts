@@ -1,8 +1,9 @@
-import { BLOODLINES, CLINIC_COSTS, EXP_PER_LEVEL, GEAR, getLevelCapForRank, ITEMS, MAX_STAMINA, MD_REGEN_BASE, MODE_CONFIG, RARE_BLOODLINE_IDS, SKILL_TIERS, SKILLS, SPIN_CONFIG, STAT_POINTS_PER_LEVEL } from './constants';
+import { BLOODLINES, CLINIC_COSTS, EXP_PER_LEVEL, FREE_REST_COOLDOWN_MS, GEAR, getLevelCapForRank, ITEMS, MAX_STAMINA, MD_REGEN_BASE, MODE_CONFIG, RARE_BLOODLINE_IDS, SKILL_TIERS, SKILLS, SPIN_CONFIG, STAT_POINTS_PER_LEVEL } from './constants';
 import type { ActiveBuff, BattleState, InventoryItem, PlayerState, QuestDefinition, SkillDefinition } from './types';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+/** @deprecated kept for save migration only */
 export function getTodayString(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -251,8 +252,10 @@ export function performSkill(state: BattleState, skillId: string): BattleState {
   const baseSkill: SkillDefinition = SKILLS[skillId];
   if (!baseSkill) return state;
 
-  // Check level requirement
-  if (state.player.stats.level < baseSkill.requiredLevel) {
+  // Check level requirement — bypass for the first skill of the equipped bloodline
+  const equippedBloodlineForLevel = state.player.equippedBloodlineId ? BLOODLINES[state.player.equippedBloodlineId] : null;
+  const isFirstBloodlineSkill = equippedBloodlineForLevel?.skillIds[0] === skillId;
+  if (!isFirstBloodlineSkill && state.player.stats.level < baseSkill.requiredLevel) {
     return {
       ...state,
       battleLog: [...state.battleLog, `${baseSkill.name} を使用するにはLV${baseSkill.requiredLevel}が必要です！`],
@@ -818,8 +821,10 @@ export function performRest(
   const maxHp = calcPlayerMaxHp(player);
 
   if (type === 'FREE') {
-    if (player.lastFreeRestDate === getTodayString()) {
-      return { player, success: false, message: '本日の無料休憩は使用済みです！明日また来てください。' };
+    const now = Date.now();
+    if (player.lastFreeRestTimestamp && now - player.lastFreeRestTimestamp < FREE_REST_COOLDOWN_MS) {
+      const hoursLeft = Math.ceil((FREE_REST_COOLDOWN_MS - (now - player.lastFreeRestTimestamp)) / (60 * 60 * 1000));
+      return { player, success: false, message: `無料休憩はあと${hoursLeft}時間後に使用できます。` };
     }
     const newHp = Math.min(maxHp, player.stats.hp + Math.floor(maxHp * 0.5));
     const newMd = Math.min(player.stats.maxMd, player.stats.md + Math.floor(player.stats.maxMd * 0.5));
@@ -827,7 +832,7 @@ export function performRest(
       player: {
         ...player,
         stats: { ...player.stats, hp: newHp, md: newMd },
-        lastFreeRestDate: getTodayString(),
+        lastFreeRestTimestamp: now,
       },
       success: true,
       message: '休憩完了！HPとChakraがそれぞれ50%回復しました。スタミナはスタミナ丸で回復してください。',

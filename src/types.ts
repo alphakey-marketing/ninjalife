@@ -101,7 +101,8 @@ export interface PlayerState {
   currentQuestId: string | null;
   bossDefeatedThisRank: boolean;
   completedQuestIds: string[];
-  lastFreeRestDate: string;
+  lastFreeRestTimestamp: number;
+  lastVitalRecovery: number;
   inventory: InventoryItem[];
   activeBuffs: ActiveBuff[];
   questResetTimestamps: Record<string, number>;

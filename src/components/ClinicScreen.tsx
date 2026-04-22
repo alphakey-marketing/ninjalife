@@ -1,6 +1,6 @@
 import { useGame } from '../gameStore';
-import { CLINIC_COSTS, STAMINA_RECOVERY_INTERVAL_MS, STAMINA_RECOVERY_AMOUNT } from '../constants';
-import { calcPlayerMaxHp, getTodayString } from '../gameLogic';
+import { CLINIC_COSTS, FREE_REST_COOLDOWN_MS, STAMINA_RECOVERY_INTERVAL_MS, STAMINA_RECOVERY_AMOUNT } from '../constants';
+import { calcPlayerMaxHp } from '../gameLogic';
 
 export function ClinicScreen() {
   const { state, dispatch } = useGame();
@@ -12,9 +12,13 @@ export function ClinicScreen() {
 
   const payBracket = CLINIC_COSTS.find(b => player.stats.level <= b.maxLevel) ?? CLINIC_COSTS[CLINIC_COSTS.length - 1];
   const payCost = payBracket.cost;
-  const freeRestUsedToday = player.lastFreeRestDate === getTodayString();
-
   const now = Date.now();
+  const lastRest = player.lastFreeRestTimestamp ?? 0;
+  const restCooldownRemaining = Math.max(0, FREE_REST_COOLDOWN_MS - (now - lastRest));
+  const freeRestOnCooldown = restCooldownRemaining > 0;
+  const restHoursLeft = Math.floor(restCooldownRemaining / (60 * 60 * 1000));
+  const restMinsLeft = Math.floor((restCooldownRemaining % (60 * 60 * 1000)) / (60 * 1000));
+
   const nextRecovery = (player.lastStaminaRecovery ?? now) + STAMINA_RECOVERY_INTERVAL_MS;
   const secsUntil = Math.max(0, Math.ceil((nextRecovery - now) / 1000));
   const minsUntil = Math.floor(secsUntil / 60);
@@ -65,13 +69,13 @@ export function ClinicScreen() {
 
       {/* Free Rest */}
       <div className="card">
-        <div className="card-title">😴 <ruby>無料<rt>むりょう</rt></ruby><ruby>休憩<rt>きゅうけい</rt></ruby>（1<ruby>日<rt>にち</rt></ruby>1<ruby>回<rt>かい</rt></ruby>）</div>
+        <div className="card-title">😴 <ruby>無料<rt>むりょう</rt></ruby><ruby>休憩<rt>きゅうけい</rt></ruby>（20<ruby>時間<rt>じかん</rt></ruby>に1<ruby>回<rt>かい</rt></ruby>）</div>
         <div className="text-small text-gray" style={{ marginBottom: '12px' }}>
-          HPとChakraを50%<ruby>回復<rt>かいふく</rt></ruby>する。1<ruby>日<rt>にち</rt></ruby>1<ruby>回限<rt>かいかぎ</rt></ruby>り。（スタミナはスタミナ<ruby>丸<rt>まる</rt></ruby>を<ruby>使用<rt>しよう</rt></ruby>）
+          HPとChakraを50%<ruby>回復<rt>かいふく</rt></ruby>する。20<ruby>時間<rt>じかん</rt></ruby>に1<ruby>回<rt>かい</rt></ruby>。（スタミナはスタミナ<ruby>丸<rt>まる</rt></ruby>を<ruby>使用<rt>しよう</rt></ruby>）
         </div>
-        {freeRestUsedToday ? (
+        {freeRestOnCooldown ? (
           <div className="text-small text-red" style={{ marginBottom: '8px' }}>
-            ✗ <ruby>本日<rt>ほんじつ</rt></ruby>の<ruby>無料休憩<rt>むりょうきゅうけい</rt></ruby>は<ruby>使用済<rt>しようずみ</rt></ruby>み
+            ✗ <ruby>無料休憩<rt>むりょうきゅうけい</rt></ruby>は<ruby>使用済<rt>しようずみ</rt></ruby>み（あと{restHoursLeft}<ruby>時間<rt>じかん</rt></ruby>{restMinsLeft}<ruby>分<rt>ぷん</rt></ruby>）
           </div>
         ) : (
           <div className="text-small text-green" style={{ marginBottom: '8px' }}>
@@ -81,7 +85,7 @@ export function ClinicScreen() {
         <button
           className="btn btn-primary"
           style={{ width: '100%' }}
-          disabled={freeRestUsedToday}
+          disabled={freeRestOnCooldown}
           onClick={() => dispatch({ type: 'REST_FREE' })}
         >
           😴 <ruby>無料休憩<rt>むりょうきゅうけい</rt></ruby>（HP/Chakra +50%）

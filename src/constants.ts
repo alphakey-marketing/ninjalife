@@ -6,12 +6,19 @@ import type { BloodlineDefinition, Element, EnemyDefinition, GearDefinition, Ite
 // 3 → 4: Added stamina/maxStamina, staminaCost on quests, playerStatusEffects in battle
 // 4 → 5: Added gear system (ownedGearIds, equippedGear), lastStaminaRecovery
 // 5 → 6: Added skillMasteries on player; element on bloodlines/enemies
-export const SAVE_VERSION = 6;
+// 6 → 7: Replaced lastFreeRestDate with lastFreeRestTimestamp; added lastVitalRecovery for passive HP/Chakra regen
+export const SAVE_VERSION = 7;
 export const MD_REGEN_BASE = 5;
 export const MAX_STAMINA = 100;
 export const STAMINA_REST_FREE = 50;
 export const STAMINA_RECOVERY_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 export const STAMINA_RECOVERY_AMOUNT = 5; // +5 per interval
+/** Passive HP/Chakra regen for broke players: +2 HP and +3 Chakra every 12 minutes */
+export const VITAL_REGEN_INTERVAL_MS = 12 * 60 * 1000; // 12 minutes
+export const VITAL_HP_REGEN_AMOUNT = 2;
+export const VITAL_MD_REGEN_AMOUNT = 3;
+/** Free rest cooldown: 20 hours in milliseconds */
+export const FREE_REST_COOLDOWN_MS = 20 * 60 * 60 * 1000;
 
 /** Display names for ranks (Naruto theme) */
 export const RANK_DISPLAY: Record<Rank, string> = {
@@ -48,9 +55,9 @@ export const SKILLS: Record<string, SkillDefinition> = {
     name: '雷切 (Chidori)',
     description: '雷を手に集中させ、敵を貫く。巨大な雷属性ダメージを与える。',
     hpCost: 0,
-    mdCost: 30,
+    mdCost: 35,
     cooldownTurn: 4,
-    requiredLevel: 8,
+    requiredLevel: 1,
     effects: {
       damageMultiplier: 2.5,
     },
@@ -59,10 +66,10 @@ export const SKILLS: Record<string, SkillDefinition> = {
     id: 'VOID_SLASH',
     name: '万花筒写輪眼・天照',
     description: '黒炎で全てを焼き尽くす。HPとChakraを消費して究極のダメージを与える。',
-    hpCost: 20,
+    hpCost: 25,
     mdCost: 20,
     cooldownTurn: 3,
-    requiredLevel: 12,
+    requiredLevel: 1,
     effects: {
       damageMultiplier: 3.0,
     },
@@ -74,7 +81,7 @@ export const SKILLS: Record<string, SkillDefinition> = {
     hpCost: 0,
     mdCost: 20,
     cooldownTurn: 3,
-    requiredLevel: 3,
+    requiredLevel: 1,
     effects: {
       damageMultiplier: 0,
       healSelfPercent: 0.15,
@@ -87,7 +94,7 @@ export const SKILLS: Record<string, SkillDefinition> = {
     hpCost: 0,
     mdCost: 25,
     cooldownTurn: 3,
-    requiredLevel: 5,
+    requiredLevel: 1,
     effects: {
       damageMultiplier: 1.2,
       mdRestore: 20,
@@ -100,7 +107,7 @@ export const SKILLS: Record<string, SkillDefinition> = {
     hpCost: 0,
     mdCost: 20,
     cooldownTurn: 3,
-    requiredLevel: 2,
+    requiredLevel: 1,
     effects: { damageMultiplier: 2.0 },
   },
   SAND_ARMOR: {
@@ -110,7 +117,7 @@ export const SKILLS: Record<string, SkillDefinition> = {
     hpCost: 0,
     mdCost: 25,
     cooldownTurn: 4,
-    requiredLevel: 4,
+    requiredLevel: 1,
     effects: { damageMultiplier: 0, healSelfPercent: 0.25 },
   },
   LIGHTNING_CLONE: {
@@ -118,9 +125,9 @@ export const SKILLS: Record<string, SkillDefinition> = {
     name: '雷遁・影分身',
     description: '雷で分身を生み出し猛攻を仕掛ける。敵を炎上状態にする可能性がある。',
     hpCost: 0,
-    mdCost: 25,
+    mdCost: 28,
     cooldownTurn: 3,
-    requiredLevel: 6,
+    requiredLevel: 1,
     effects: { damageMultiplier: 1.8, burnChance: 0.30, burnDamagePerTurn: 6, burnDuration: 3 },
   },
   EARTH_SPIKE: {
@@ -128,9 +135,9 @@ export const SKILLS: Record<string, SkillDefinition> = {
     name: '土遁・土流壁（どりゅうへき）',
     description: '地底から巨大な土壁（どへき）を隆起させ敵を攻撃する。大ダメージを与える。',
     hpCost: 0,
-    mdCost: 30,
-    cooldownTurn: 4,
-    requiredLevel: 10,
+    mdCost: 35,
+    cooldownTurn: 5,
+    requiredLevel: 1,
     effects: { damageMultiplier: 2.2 },
   },
   WIND_SLASH: {
@@ -140,7 +147,7 @@ export const SKILLS: Record<string, SkillDefinition> = {
     hpCost: 0,
     mdCost: 18,
     cooldownTurn: 2,
-    requiredLevel: 3,
+    requiredLevel: 1,
     effects: { damageMultiplier: 1.6 },
   },
   SHADOW_BIND: {
@@ -150,17 +157,17 @@ export const SKILLS: Record<string, SkillDefinition> = {
     hpCost: 0,
     mdCost: 20,
     cooldownTurn: 3,
-    requiredLevel: 5,
+    requiredLevel: 1,
     effects: { damageMultiplier: 1.4, mdRestore: 15 },
   },
   BONE_LANCE: {
     id: 'BONE_LANCE',
     name: '屍骨脈（しこつみゃく）・骨槍（こつやり）',
     description: '自らの骨を槍として敵を貫く。HPを消費して壊滅的なダメージを与える。',
-    hpCost: 20,
+    hpCost: 25,
     mdCost: 25,
-    cooldownTurn: 4,
-    requiredLevel: 15,
+    cooldownTurn: 5,
+    requiredLevel: 1,
     effects: { damageMultiplier: 2.8 },
   },
   // ── Advanced nature exclusive skills ────────────────────────────────────────
@@ -171,7 +178,7 @@ export const SKILLS: Record<string, SkillDefinition> = {
     hpCost: 0,
     mdCost: 35,
     cooldownTurn: 5,
-    requiredLevel: 20,
+    requiredLevel: 12,
     effects: { damageMultiplier: 2.4, ignoreDefense: true },
   },
   SHADOW_STITCH: {
@@ -181,7 +188,7 @@ export const SKILLS: Record<string, SkillDefinition> = {
     hpCost: 0,
     mdCost: 30,
     cooldownTurn: 5,
-    requiredLevel: 20,
+    requiredLevel: 15,
     effects: { damageMultiplier: 1.6, skipEnemyTurn: true },
   },
   BONE_THOUSAND: {
@@ -191,7 +198,7 @@ export const SKILLS: Record<string, SkillDefinition> = {
     hpCost: 30,
     mdCost: 40,
     cooldownTurn: 6,
-    requiredLevel: 25,
+    requiredLevel: 20,
     effects: { damageMultiplier: 1.0, multiHitCount: 3 },
   },
 };
@@ -476,7 +483,7 @@ export const QUESTS: QuestDefinition[] = [
     requiredRank: 'E',
     targetEnemyId: 'TRAINING_DUMMY',
     targetCount: 5,
-    reward: { exp: 50, ryo: 80 },
+    reward: { exp: 50, ryo: 100 },
     repeatType: 'UNLIMITED',
     staminaCost: 5,
   },
@@ -489,7 +496,7 @@ export const QUESTS: QuestDefinition[] = [
     requiredRank: 'E',
     targetEnemyId: 'FOREST_WOLF',
     targetCount: 3,
-    reward: { exp: 100, ryo: 100 },
+    reward: { exp: 100, ryo: 120 },
     repeatType: 'UNLIMITED',
     staminaCost: 5,
   },

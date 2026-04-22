@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import type { BattleState, PlayerState, Screen } from './types';
-import { ENEMIES, GEAR, ITEMS, QUESTS, SAVE_VERSION, MAX_STAMINA, STAMINA_RECOVERY_INTERVAL_MS, STAMINA_RECOVERY_AMOUNT } from './constants';
+import { ENEMIES, GEAR, ITEMS, QUESTS, SAVE_VERSION, MAX_STAMINA, STAMINA_RECOVERY_INTERVAL_MS, STAMINA_RECOVERY_AMOUNT, VITAL_REGEN_INTERVAL_MS, VITAL_HP_REGEN_AMOUNT, VITAL_MD_REGEN_AMOUNT } from './constants';
 import {
   applyItemEffect,
   applyStatPoint,
+  calcPlayerMaxHp,
   canRankUp,
   calcEnemyDamage,
   checkLevelUp,
@@ -27,6 +28,7 @@ interface GameState {
   player: PlayerState;
   battle: BattleState | null;
   notifications: string[];
+  lastSpinBloodlineId: string | null;
 }
 
 type GameAction =
@@ -82,7 +84,8 @@ const initialPlayer: PlayerState = {
   currentQuestId: null,
   bossDefeatedThisRank: false,
   completedQuestIds: [],
-  lastFreeRestDate: '',
+  lastFreeRestTimestamp: 0,
+  lastVitalRecovery: Date.now(),
   inventory: [],
   activeBuffs: [],
   questResetTimestamps: {},
@@ -99,6 +102,7 @@ const initialState: GameState = {
   player: initialPlayer,
   battle: null,
   notifications: [],
+  lastSpinBloodlineId: null,
 };
 
 function notify(state: GameState, message: string): GameState {
@@ -346,7 +350,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (!bloodlineId) {
         return notify(state, result);
       }
-      return notify({ ...state, player: newPlayer }, result);
+      return notify({ ...state, player: newPlayer, lastSpinBloodlineId: bloodlineId }, result);
     }
 
     case 'EQUIP_BLOODLINE': {
@@ -438,18 +442,39 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'STAMINA_TICK': {
-      if (state.player.stamina >= state.player.maxStamina) return state;
       const now = Date.now();
-      const last = state.player.lastStaminaRecovery ?? now;
-      const intervals = Math.floor((now - last) / STAMINA_RECOVERY_INTERVAL_MS);
-      if (intervals <= 0) return state;
-      const gain = intervals * STAMINA_RECOVERY_AMOUNT;
-      const newStamina = Math.min(state.player.maxStamina, state.player.stamina + gain);
-      const newLast = last + intervals * STAMINA_RECOVERY_INTERVAL_MS;
-      return {
-        ...state,
-        player: { ...state.player, stamina: newStamina, lastStaminaRecovery: newLast },
-      };
+      let newPlayer = state.player;
+
+      // Stamina recovery
+      if (newPlayer.stamina < newPlayer.maxStamina) {
+        const last = newPlayer.lastStaminaRecovery ?? now;
+        const intervals = Math.floor((now - last) / STAMINA_RECOVERY_INTERVAL_MS);
+        if (intervals > 0) {
+          const gain = intervals * STAMINA_RECOVERY_AMOUNT;
+          newPlayer = {
+            ...newPlayer,
+            stamina: Math.min(newPlayer.maxStamina, newPlayer.stamina + gain),
+            lastStaminaRecovery: last + intervals * STAMINA_RECOVERY_INTERVAL_MS,
+          };
+        }
+      }
+
+      // Passive HP + Chakra regen (always ticks, even at 0 Ryo)
+      const lastVital = newPlayer.lastVitalRecovery ?? now;
+      const vitalIntervals = Math.floor((now - lastVital) / VITAL_REGEN_INTERVAL_MS);
+      if (vitalIntervals > 0) {
+        const maxHp = calcPlayerMaxHp(newPlayer);
+        const newHp = Math.min(maxHp, newPlayer.stats.hp + vitalIntervals * VITAL_HP_REGEN_AMOUNT);
+        const newMd = Math.min(newPlayer.stats.maxMd, newPlayer.stats.md + vitalIntervals * VITAL_MD_REGEN_AMOUNT);
+        newPlayer = {
+          ...newPlayer,
+          stats: { ...newPlayer.stats, hp: newHp, md: newMd },
+          lastVitalRecovery: lastVital + vitalIntervals * VITAL_REGEN_INTERVAL_MS,
+        };
+      }
+
+      if (newPlayer === state.player) return state;
+      return { ...state, player: newPlayer };
     }
 
     case 'SAVE_GAME': {
@@ -467,13 +492,21 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         if (saved) {
           const raw = JSON.parse(saved);
           // Support both new format { saveVersion, player } and legacy format (raw player)
-          const rawPlayer = (raw.saveVersion !== undefined ? raw.player : raw) as PlayerState & { freeRestUsedToday?: boolean };
-          // Build clean player without deprecated freeRestUsedToday field
-          const { freeRestUsedToday: _deprecated, ...cleanPlayer } = rawPlayer;
+          const rawPlayer = (raw.saveVersion !== undefined ? raw.player : raw) as PlayerState & {
+            freeRestUsedToday?: boolean;
+            lastFreeRestDate?: string;
+            lastVitalRecovery?: number;
+          };
+          // Build clean player without deprecated fields
+          const { freeRestUsedToday: _deprecated, lastFreeRestDate: _oldDate, ...cleanPlayer } = rawPlayer;
+          // Migrate lastFreeRestDate → lastFreeRestTimestamp
+          const lastFreeRestTimestamp: number = rawPlayer.lastFreeRestTimestamp
+            ?? (_deprecated || _oldDate === getTodayString() ? Date.now() - 0 : 0);
           const player: PlayerState = {
             ...cleanPlayer,
             completedQuestIds: rawPlayer.completedQuestIds ?? [],
-            lastFreeRestDate: rawPlayer.lastFreeRestDate ?? (_deprecated ? getTodayString() : ''),
+            lastFreeRestTimestamp,
+            lastVitalRecovery: rawPlayer.lastVitalRecovery ?? Date.now(),
             inventory: rawPlayer.inventory ?? [],
             activeBuffs: rawPlayer.activeBuffs ?? [],
             questResetTimestamps: rawPlayer.questResetTimestamps ?? {},
@@ -545,12 +578,19 @@ function tryAutoLoadState(): GameState {
     const saved = localStorage.getItem('ninjalife_save');
     if (!saved) return initialState;
     const raw = JSON.parse(saved);
-    const rawPlayer = (raw.saveVersion !== undefined ? raw.player : raw) as PlayerState & { freeRestUsedToday?: boolean };
-    const { freeRestUsedToday: _deprecated, ...cleanPlayer } = rawPlayer;
+    const rawPlayer = (raw.saveVersion !== undefined ? raw.player : raw) as PlayerState & {
+      freeRestUsedToday?: boolean;
+      lastFreeRestDate?: string;
+      lastVitalRecovery?: number;
+    };
+    const { freeRestUsedToday: _deprecated, lastFreeRestDate: _oldDate, ...cleanPlayer } = rawPlayer;
+    const lastFreeRestTimestamp: number = rawPlayer.lastFreeRestTimestamp
+      ?? (_deprecated || _oldDate === getTodayString() ? Date.now() : 0);
     const player: PlayerState = {
       ...cleanPlayer,
       completedQuestIds: rawPlayer.completedQuestIds ?? [],
-      lastFreeRestDate: rawPlayer.lastFreeRestDate ?? (_deprecated ? getTodayString() : ''),
+      lastFreeRestTimestamp,
+      lastVitalRecovery: rawPlayer.lastVitalRecovery ?? Date.now(),
       inventory: rawPlayer.inventory ?? [],
       activeBuffs: rawPlayer.activeBuffs ?? [],
       questResetTimestamps: rawPlayer.questResetTimestamps ?? {},
@@ -561,7 +601,7 @@ function tryAutoLoadState(): GameState {
       equippedGear: rawPlayer.equippedGear ?? { weapon: null, armor: null, accessory: null },
       skillMasteries: rawPlayer.skillMasteries ?? {},
     };
-    return { screen: 'HUB', player, battle: null, notifications: [] };
+    return { screen: 'HUB', player, battle: null, notifications: [], lastSpinBloodlineId: null };
   } catch {
     return initialState;
   }
