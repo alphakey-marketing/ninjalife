@@ -500,8 +500,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           // Build clean player without deprecated fields
           const { freeRestUsedToday: _deprecated, lastFreeRestDate: _oldDate, ...cleanPlayer } = rawPlayer;
           // Migrate lastFreeRestDate → lastFreeRestTimestamp
+          // If old save shows rest was used today, treat as used just now (20-hour cooldown applies).
+          // Otherwise default to 0 (free rest immediately available).
           const lastFreeRestTimestamp: number = rawPlayer.lastFreeRestTimestamp
-            ?? (_deprecated || _oldDate === getTodayString() ? Date.now() - 0 : 0);
+            ?? (_deprecated || _oldDate === getTodayString() ? Date.now() : 0);
           const player: PlayerState = {
             ...cleanPlayer,
             completedQuestIds: rawPlayer.completedQuestIds ?? [],
