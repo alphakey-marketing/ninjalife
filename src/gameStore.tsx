@@ -103,6 +103,7 @@ const initialPlayer: PlayerState = {
   skillMasteries: {},
   killStreak: 0,
   lastWorldBossKills: {},
+  clearedBossIds: [],
 };
 
 const initialState: GameState = {
@@ -227,6 +228,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'BATTLE_RUN': {
       const battlePlayer = state.battle ? state.battle.player : state.player;
+      const isSyntheticBattle = state.battle?.questId?.startsWith('__') ?? false;
       // Use state.player as base to avoid snapshot staleness; carry over current battle HP
       const restoredPlayer: PlayerState = {
         ...state.player,
@@ -241,7 +243,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       };
       return {
         ...state,
-        screen: 'HUB',
+        screen: isSyntheticBattle ? 'MAP' : 'HUB',
         battle: null,
         player: restoredPlayer,
         notifications: [...state.notifications, '逃走成功！'],
@@ -356,6 +358,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           if (!already) {
             player = { ...player, ownedBloodlines: [...player.ownedBloodlines, { id: drop.bloodlineId!, mastery: 0 }] };
           }
+        } else if (drop.type === 'GEAR' && drop.gearId) {
+          const gearIds = player.ownedGearIds ?? [];
+          if (!gearIds.includes(drop.gearId)) {
+            player = { ...player, ownedGearIds: [...gearIds, drop.gearId] };
+          }
         }
       }
 
@@ -419,6 +426,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           if (!already) {
             player = { ...player, ownedBloodlines: [...player.ownedBloodlines, { id: drop.bloodlineId!, mastery: 0 }] };
           }
+        } else if (drop.type === 'GEAR' && drop.gearId) {
+          const gearIds = player.ownedGearIds ?? [];
+          if (!gearIds.includes(drop.gearId)) {
+            player = { ...player, ownedGearIds: [...gearIds, drop.gearId] };
+          }
         }
       }
       // Update boss kill timestamp if world boss
@@ -428,6 +440,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         const bossId = bossQuestId.replace('__BOSS__', '');
         lastWorldBossKills = { ...lastWorldBossKills, [bossId]: Date.now() };
       }
+      // Track first-clear for world bosses
+      const bossDef = state.battle.isWorldBoss
+        ? WORLD_BOSSES.find(b => b.enemyId === state.battle!.enemy.definition.id)
+        : null;
+      const newClearedBossIds = bossDef && !(player.clearedBossIds ?? []).includes(bossDef.id)
+        ? [...(player.clearedBossIds ?? []), bossDef.id]
+        : player.clearedBossIds ?? [];
       player = {
         ...player,
         ryo: player.ryo + bonusRyo,
@@ -440,6 +459,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         isInMode: false,
         inventory: newInventory,
         lastWorldBossKills,
+        clearedBossIds: newClearedBossIds,
       };
       player = checkLevelUp(player);
       const navigateTo: Screen = state.battle.isWorldBoss || state.battle.questId.startsWith('__ZONE__') ? 'MAP' : 'HUB';
@@ -682,6 +702,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             skillMasteries: rawPlayer.skillMasteries ?? {},
             killStreak: (rawPlayer as PlayerState).killStreak ?? 0,
             lastWorldBossKills: (rawPlayer as PlayerState).lastWorldBossKills ?? {},
+            clearedBossIds: (rawPlayer as PlayerState).clearedBossIds ?? [],
           };
           return notify({ ...state, player, screen: 'HUB', battle: null }, 'ゲームを読み込みました！');
         }
@@ -768,6 +789,7 @@ function tryAutoLoadState(): GameState {
       skillMasteries: rawPlayer.skillMasteries ?? {},
       killStreak: (rawPlayer as PlayerState).killStreak ?? 0,
       lastWorldBossKills: (rawPlayer as PlayerState).lastWorldBossKills ?? {},
+      clearedBossIds: (rawPlayer as PlayerState).clearedBossIds ?? [],
     };
     return { screen: 'HUB', player, battle: null, notifications: [], lastSpinBloodlineId: null };
   } catch {

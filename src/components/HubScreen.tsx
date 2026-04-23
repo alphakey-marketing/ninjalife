@@ -1,5 +1,5 @@
 import { useGame } from '../gameStore';
-import { BLOODLINES, EXP_PER_LEVEL, GEAR, getLevelCapForRank, RANK_DISPLAY, STAMINA_RECOVERY_INTERVAL_MS, STAMINA_RECOVERY_AMOUNT } from '../constants';
+import { BLOODLINES, EXP_PER_LEVEL, GEAR, getLevelCapForRank, RANK_DISPLAY, STAMINA_RECOVERY_INTERVAL_MS, STAMINA_RECOVERY_AMOUNT, QUESTS } from '../constants';
 import { canRankUp, calcPlayerMaxHp } from '../gameLogic';
 
 export function HubScreen() {
@@ -133,6 +133,25 @@ export function HubScreen() {
           })}
         </div>
       </div>
+
+      {/* Active Quest Tracker */}
+      {player.currentQuestId && (() => {
+        const activeQuest = QUESTS.find(q => q.id === player.currentQuestId);
+        if (!activeQuest) return null;
+        return (
+          <div className="card">
+            <div className="card-title">📋 <ruby>進行中<rt>しんこうちゅう</rt></ruby>ミッション</div>
+            <div className="text-small">{activeQuest.name}</div>
+            <div className="text-small text-gray" style={{ marginTop: '4px' }}>
+              {activeQuest.description}
+            </div>
+            <button className="btn btn-primary" style={{ marginTop: '8px' }}
+              onClick={() => dispatch({ type: 'NAVIGATE', screen: 'QUEST' })}>
+              ⚔ 任務へ
+            </button>
+          </div>
+        );
+      })()}
 
       {/* Navigation */}
       <div className="card">

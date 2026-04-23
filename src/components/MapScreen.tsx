@@ -153,6 +153,16 @@ export function MapScreen() {
                         {TIER_LABEL[boss.tier]}
                       </span>
                     </div>
+                    {boss.signatureBloodlineId && !player.clearedBossIds?.includes(boss.id) && (
+                      <div className="text-small text-gold" style={{ marginTop: '4px' }}>
+                        🌟 <ruby>初回討伐<rt>しょかいとうばつ</rt></ruby>報酬: {boss.signatureBloodlineId} の血継限界！
+                      </div>
+                    )}
+                    {player.clearedBossIds?.includes(boss.id) && (
+                      <div className="text-small text-green" style={{ marginTop: '4px' }}>
+                        ✓ 初回討伐済み
+                      </div>
+                    )}
                     {bossAvailable ? (
                       <button
                         className="btn btn-danger"

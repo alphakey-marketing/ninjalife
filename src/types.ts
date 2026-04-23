@@ -114,6 +114,7 @@ export interface PlayerState {
   skillMasteries: Record<string, number>;
   killStreak: number;
   lastWorldBossKills: Record<string, number>;
+  clearedBossIds: string[];
 }
 
 export interface SkillEffectNumbers {

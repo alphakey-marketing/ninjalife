@@ -56,6 +56,7 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     skillMasteries: {},
     killStreak: 0,
     lastWorldBossKills: {},
+    clearedBossIds: [],
     ...overrides,
   };
 }

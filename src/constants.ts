@@ -1137,7 +1137,7 @@ export const WORLD_BOSSES: WorldBossDefinition[] = [
     tier: 'WORLD',
     cooldownMs: 2 * 60 * 60 * 1000,
     enemyId: 'BOSS_DEMON_SHARK_ENEMY',
-    guaranteedDrops: ['CHAKRA_PILL', 'ATK_SCROLL'],
+    guaranteedDrops: ['CHAKRA_PILL', 'ATK_SCROLL', 'WIND_BLADE'],
     signatureBloodlineId: 'MIST',
   },
   {
@@ -1147,7 +1147,7 @@ export const WORLD_BOSSES: WorldBossDefinition[] = [
     tier: 'WORLD',
     cooldownMs: 2 * 60 * 60 * 1000,
     enemyId: 'BOSS_NINE_TAILS_ENEMY',
-    guaranteedDrops: ['STAMINA_PILL', 'ATK_SCROLL'],
+    guaranteedDrops: ['STAMINA_PILL', 'ATK_SCROLL', 'ANBU_ARMOR'],
     signatureBloodlineId: 'VOID',
   },
   {
@@ -1157,7 +1157,7 @@ export const WORLD_BOSSES: WorldBossDefinition[] = [
     tier: 'LEGENDARY',
     cooldownMs: 8 * 60 * 60 * 1000,
     enemyId: 'BOSS_THUNDER_GOD_ENEMY',
-    guaranteedDrops: ['STAMINA_PILL', 'ATK_SCROLL', 'CHAKRA_PILL'],
+    guaranteedDrops: ['STAMINA_PILL', 'ATK_SCROLL', 'CHAKRA_PILL', 'THUNDER_FANG'],
     signatureBloodlineId: 'STORM',
   },
 ];

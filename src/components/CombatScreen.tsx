@@ -69,6 +69,11 @@ export function CombatScreen() {
         <span className="text-small text-gray">
           {battle.enemiesDefeated}/{battle.targetCount} <ruby>撃破<rt>げきは</rt></ruby> | ターン {battle.turnNumber}
         </span>
+        {state.player.killStreak > 0 && (
+          <span className="text-small" style={{ color: '#ff9800' }}>
+            🔥 {state.player.killStreak} 連殺
+          </span>
+        )}
       </div>
 
       {/* Combat Display */}
@@ -223,6 +228,16 @@ export function CombatScreen() {
           <div className="text-bold text-gold" style={{ marginBottom: '8px' }}>
             ✓ <ruby>敵<rt>てき</rt></ruby>を<ruby>倒<rt>たお</rt></ruby>した！({battle.enemiesDefeated + 1}/{battle.targetCount})
           </div>
+          {battle.pendingDrops && battle.pendingDrops.length > 0 && (
+            <div style={{ marginBottom: '8px' }}>
+              <div className="text-small text-gold" style={{ marginBottom: '4px' }}>🎁 ドロップ:</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                {battle.pendingDrops.map((drop, i) => (
+                  <span key={i} className="buff-badge">{drop.label}</span>
+                ))}
+              </div>
+            </div>
+          )}
           <button className="btn btn-primary" onClick={() => dispatch({ type: 'BATTLE_NEXT_ENEMY' })}>
             <ruby>次<rt>つぎ</rt></ruby>の<ruby>敵<rt>てき</rt></ruby> →
           </button>
@@ -267,7 +282,7 @@ export function CombatScreen() {
           <div className="text-bold text-red" style={{ marginBottom: '8px' }}>
             💀 <ruby>敗北<rt>はいぼく</rt></ruby>した…
           </div>
-          <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: 'HUB' })}>
+          <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: isSynthetic ? 'MAP' : 'HUB' })}>
             <ruby>拠点<rt>きょてん</rt></ruby>に<ruby>戻<rt>もど</rt></ruby>る
           </button>
         </div>

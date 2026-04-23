@@ -1044,16 +1044,19 @@ export function rollBattleDrops(enemyId: string): BattleDrop[] {
 }
 
 export function rollBossDrops(boss: WorldBossDefinition, isFirstKill: boolean): BattleDrop[] {
-  const drops: BattleDrop[] = boss.guaranteedDrops.map(itemId => {
-    const item = ITEMS[itemId];
-    return { type: 'ITEM' as const, itemId, label: item?.name ?? itemId };
+  const drops: BattleDrop[] = boss.guaranteedDrops.map(id => {
+    const item = ITEMS[id];
+    if (item) return { type: 'ITEM' as const, itemId: id, label: item.name };
+    const gear = GEAR[id];
+    if (gear) return { type: 'GEAR' as const, gearId: id, label: `⚔ ${gear.name} [${gear.rarity}]` };
+    return { type: 'ITEM' as const, itemId: id, label: id };
   });
   const ryo = 200 + Math.floor(Math.random() * 101);
   drops.push({ type: 'RYO', ryo, label: `+${ryo} Ryo` });
   if (isFirstKill && boss.signatureBloodlineId) {
     const bloodline = BLOODLINES[boss.signatureBloodlineId];
     const bloodlineName = bloodline?.name ?? boss.signatureBloodlineId;
-    drops.push({ type: 'BLOODLINE_SCROLL', bloodlineId: boss.signatureBloodlineId, label: `血継限界の巻物（${bloodlineName}）` });
+    drops.push({ type: 'BLOODLINE_SCROLL', bloodlineId: boss.signatureBloodlineId, label: `🌟 血継限界の巻物：${boss.signatureBloodlineId} (${bloodlineName})` });
   }
   return drops;
 }
