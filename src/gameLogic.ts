@@ -1045,10 +1045,10 @@ export function rollBattleDrops(enemyId: string): BattleDrop[] {
 
 export function rollBossDrops(boss: WorldBossDefinition, isFirstKill: boolean): BattleDrop[] {
   const drops: BattleDrop[] = boss.guaranteedDrops.map(id => {
-    const item = ITEMS[id];
-    if (item) return { type: 'ITEM' as const, itemId: id, label: item.name };
     const gear = GEAR[id];
     if (gear) return { type: 'GEAR' as const, gearId: id, label: `⚔ ${gear.name} [${gear.rarity}]` };
+    const item = ITEMS[id];
+    if (item) return { type: 'ITEM' as const, itemId: id, label: item.name };
     return { type: 'ITEM' as const, itemId: id, label: id };
   });
   const ryo = 200 + Math.floor(Math.random() * 101);

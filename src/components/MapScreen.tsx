@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useGame } from '../gameStore';
-import { WORLD_ZONES, WORLD_BOSSES, ENEMIES, ELEMENT_EMOJI } from '../constants';
+import { WORLD_ZONES, WORLD_BOSSES, ENEMIES, ELEMENT_EMOJI, BLOODLINES } from '../constants';
 import { renderRuby } from '../utils/renderRuby';
 import { isBossAvailable, bossNextAvailableMs } from '../gameLogic';
 
@@ -155,7 +155,7 @@ export function MapScreen() {
                     </div>
                     {boss.signatureBloodlineId && !player.clearedBossIds?.includes(boss.id) && (
                       <div className="text-small text-gold" style={{ marginTop: '4px' }}>
-                        🌟 <ruby>初回討伐<rt>しょかいとうばつ</rt></ruby>報酬: {boss.signatureBloodlineId} の血継限界！
+                        🌟 <ruby>初回討伐<rt>しょかいとうばつ</rt></ruby>報酬: {BLOODLINES[boss.signatureBloodlineId]?.name ?? boss.signatureBloodlineId} の血継限界！
                       </div>
                     )}
                     {player.clearedBossIds?.includes(boss.id) && (
