@@ -177,6 +177,23 @@ export function StatusScreen() {
           <span className="stat-value">{player.completedQuestIds.length}</span>
         </div>
       </div>
+
+      {/* PoC: Jade Debug — remove when real payment is added */}
+      <div className="card">
+        <div className="card-title">💎 翠玉（テスト）</div>
+        <div className="stat-row">
+          <span className="stat-label">翠玉残高</span>
+          <span className="stat-value-gold">💎 {player.jade ?? 0}</span>
+        </div>
+        <button
+          className="btn btn-primary"
+          style={{ marginTop: '8px' }}
+          onClick={() => dispatch({ type: 'ADD_JADE', amount: 100 })}
+        >
+          {/* POC_FREE_JADE */}
+          +100 翠玉 受取（テスト）
+        </button>
+      </div>
     </div>
   );
 }

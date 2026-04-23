@@ -285,6 +285,15 @@ export function CombatScreen() {
           <button className="btn" onClick={() => dispatch({ type: 'NAVIGATE', screen: isSynthetic ? 'MAP' : 'HUB' })}>
             <ruby>拠点<rt>きょてん</rt></ruby>に<ruby>戻<rt>もど</rt></ruby>る
           </button>
+          {(state.player.jade ?? 0) >= 15 && (
+            <button
+              className="btn btn-primary"
+              style={{ marginTop: '8px', borderColor: '#26c6da', color: '#26c6da' }}
+              onClick={() => dispatch({ type: 'SPEND_JADE', itemId: 'JADE_HP_MD_RESTORE' })}
+            >
+              💎 15 翠玉でHP・チャクラ全回復して<ruby>続行<rt>ぞっこう</rt></ruby>
+            </button>
+          )}
         </div>
       )}
     </div>

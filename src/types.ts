@@ -115,6 +115,8 @@ export interface PlayerState {
   killStreak: number;
   lastWorldBossKills: Record<string, number>;
   clearedBossIds: string[];
+  jade: number;
+  lastLoginDate: string; // ISO date string "YYYY-MM-DD" for daily login
 }
 
 export interface SkillEffectNumbers {

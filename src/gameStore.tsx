@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import type { BattleState, BattleDrop, PlayerState, Screen } from './types';
-import { ENEMIES, GEAR, ITEMS, QUESTS, SAVE_VERSION, MAX_STAMINA, STAMINA_RECOVERY_INTERVAL_MS, STAMINA_RECOVERY_AMOUNT, VITAL_REGEN_INTERVAL_MS, VITAL_HP_REGEN_AMOUNT, VITAL_MD_REGEN_AMOUNT, WORLD_BOSSES, WORLD_ZONES, KILL_STREAK_BONUS_RYO, KILL_STREAK_THRESHOLD } from './constants';
+import { ENEMIES, GEAR, ITEMS, JADE_SHOP_ITEMS, QUESTS, SAVE_VERSION, MAX_STAMINA, STAMINA_RECOVERY_INTERVAL_MS, STAMINA_RECOVERY_AMOUNT, VITAL_REGEN_INTERVAL_MS, VITAL_HP_REGEN_AMOUNT, VITAL_MD_REGEN_AMOUNT, WORLD_BOSSES, WORLD_ZONES, KILL_STREAK_BONUS_RYO, KILL_STREAK_THRESHOLD } from './constants';
 import {
   applyItemEffect,
   applyStatPoint,
@@ -64,7 +64,10 @@ type GameAction =
   | { type: 'SAVE_GAME' }
   | { type: 'LOAD_GAME' }
   | { type: 'DEQUEUE_NOTIFICATION' }
-  | { type: 'SET_PLAYER_NAME'; name: string };
+  | { type: 'SET_PLAYER_NAME'; name: string }
+  | { type: 'SPEND_JADE'; itemId: string }
+  | { type: 'ADD_JADE'; amount: number }
+  | { type: 'DAILY_LOGIN_CHECK' };
 
 const initialPlayer: PlayerState = {
   name: 'Ninja',
@@ -104,6 +107,8 @@ const initialPlayer: PlayerState = {
   killStreak: 0,
   lastWorldBossKills: {},
   clearedBossIds: [],
+  jade: 0,
+  lastLoginDate: '',
 };
 
 const initialState: GameState = {
@@ -444,6 +449,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const bossDef = state.battle.isWorldBoss
         ? WORLD_BOSSES.find(b => b.enemyId === state.battle!.enemy.definition.id)
         : null;
+      const isNewBossClear = bossDef != null && !(state.player.clearedBossIds ?? []).includes(bossDef.id);
       const newClearedBossIds = bossDef && !(player.clearedBossIds ?? []).includes(bossDef.id)
         ? [...(player.clearedBossIds ?? []), bossDef.id]
         : player.clearedBossIds ?? [];
@@ -460,12 +466,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         inventory: newInventory,
         lastWorldBossKills,
         clearedBossIds: newClearedBossIds,
+        jade: isNewBossClear
+          ? (player.jade ?? 0) + 50
+          : (player.jade ?? 0),
       };
       player = checkLevelUp(player);
       const navigateTo: Screen = state.battle.isWorldBoss || state.battle.questId.startsWith('__ZONE__') ? 'MAP' : 'HUB';
-      const dropMsg = pendingDrops.length > 0
+      const dropMsg = (pendingDrops.length > 0
         ? `ドロップ獲得！${bonusRyo > 0 ? ` +${bonusRyo} Ryo` : ''}`
-        : 'ドロップなし';
+        : 'ドロップなし') + (isNewBossClear ? ' 🎉 初回討伐ボーナス：+50 翠玉！' : '');
       autoSave(player);
       return notify({ ...state, screen: navigateTo, battle: null, player }, dropMsg);
     }
@@ -554,7 +563,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         return notify(state, 'まだ昇進条件を満たしていません！LV30とBOSS討伐が必要です。');
       }
       const newPlayer = performRankUp(state.player);
-      return notify({ ...state, player: newPlayer }, `おめでとう！Rank ${newPlayer.rank} に昇進しました！`);
+      const jadeBonus = 100;
+      const playerWithJade = { ...newPlayer, jade: (newPlayer.jade ?? 0) + jadeBonus };
+      return notify({ ...state, player: playerWithJade }, `おめでとう！Rank ${newPlayer.rank} に昇進しました！ +${jadeBonus} 翠玉！`); // POC_FREE_JADE
     }
 
     case 'REST_FREE': {
@@ -703,6 +714,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             killStreak: (rawPlayer as PlayerState).killStreak ?? 0,
             lastWorldBossKills: (rawPlayer as PlayerState).lastWorldBossKills ?? {},
             clearedBossIds: (rawPlayer as PlayerState).clearedBossIds ?? [],
+            jade: (rawPlayer as PlayerState).jade ?? 0,
+            lastLoginDate: (rawPlayer as PlayerState).lastLoginDate ?? '',
           };
           return notify({ ...state, player, screen: 'HUB', battle: null }, 'ゲームを読み込みました！');
         }
@@ -755,6 +768,45 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       );
     }
 
+    case 'ADD_JADE': {
+      // POC_FREE_JADE - remove when real payment is added
+      return notify({ ...state, player: { ...state.player, jade: (state.player.jade ?? 0) + action.amount } }, `+${action.amount} 翠玉を獲得！`);
+    }
+
+    case 'SPEND_JADE': {
+      const jadeItem = JADE_SHOP_ITEMS.find(i => i.id === action.itemId);
+      if (!jadeItem) return notify(state, '無効なアイテムです。');
+      const currentJade = state.player.jade ?? 0;
+      if (currentJade < jadeItem.jadeCost) return notify(state, `翠玉が不足しています！必要: ${jadeItem.jadeCost} 翠玉`);
+
+      let updatedPlayer: PlayerState = { ...state.player, jade: currentJade - jadeItem.jadeCost };
+
+      if (jadeItem.effect === 'STAMINA_REFILL') {
+        updatedPlayer = { ...updatedPlayer, stamina: updatedPlayer.maxStamina };
+      } else if (jadeItem.effect === 'HP_MD_RESTORE') {
+        const maxHp = calcPlayerMaxHp(updatedPlayer);
+        updatedPlayer = { ...updatedPlayer, stats: { ...updatedPlayer.stats, hp: maxHp, md: updatedPlayer.stats.maxMd } };
+      } else if (jadeItem.effect === 'EXTRA_SPIN') {
+        // EXTRA_SPIN: navigate to spin screen (the spend is enough — spin itself is free)
+        return notify({ ...state, player: updatedPlayer, screen: 'SPIN' as Screen }, `${jadeItem.nameJp}を使用しました！`);
+      } else if (jadeItem.effect === 'REST_CD_SKIP') {
+        updatedPlayer = { ...updatedPlayer, lastFreeRestTimestamp: 0 };
+      }
+
+      return notify({ ...state, player: updatedPlayer }, `${jadeItem.nameJp}を使用しました！`);
+    }
+
+    case 'DAILY_LOGIN_CHECK': {
+      const today = new Date().toISOString().slice(0, 10);
+      const lastLogin = state.player.lastLoginDate ?? '';
+      if (lastLogin === today) return state;
+      const jade = (state.player.jade ?? 0) + 20;
+      return notify(
+        { ...state, player: { ...state.player, jade, lastLoginDate: today } },
+        '🌅 デイリーログインボーナス：+20 翠玉！', // POC_FREE_JADE
+      );
+    }
+
     default:
       return state;
   }
@@ -790,6 +842,8 @@ function tryAutoLoadState(): GameState {
       killStreak: (rawPlayer as PlayerState).killStreak ?? 0,
       lastWorldBossKills: (rawPlayer as PlayerState).lastWorldBossKills ?? {},
       clearedBossIds: (rawPlayer as PlayerState).clearedBossIds ?? [],
+      jade: (rawPlayer as PlayerState).jade ?? 0,
+      lastLoginDate: (rawPlayer as PlayerState).lastLoginDate ?? '',
     };
     return { screen: 'HUB', player, battle: null, notifications: [], lastSpinBloodlineId: null };
   } catch {
@@ -813,11 +867,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state.notifications]);
 
-  // Stamina real-time recovery: check every 60s
+  // Stamina real-time recovery: check every 10s
   useEffect(() => {
-    const interval = setInterval(() => dispatch({ type: 'STAMINA_TICK' }), 60_000);
+    const interval = setInterval(() => dispatch({ type: 'STAMINA_TICK' }), 10_000);
     return () => clearInterval(interval);
   }, [dispatch]);
+
+  // Daily login bonus check on mount
+  useEffect(() => {
+    dispatch({ type: 'DAILY_LOGIN_CHECK' });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <GameContext.Provider value={{ state, dispatch }}>

@@ -1037,7 +1037,7 @@ export function rollBattleDrops(enemyId: string): BattleDrop[] {
     }
   }
   if (enemyId !== 'TRAINING_DUMMY') {
-    const ryo = 5 + Math.floor(Math.random() * 16);
+    const ryo = 8 + Math.floor(Math.random() * 18);
     drops.push({ type: 'RYO', ryo, label: `+${ryo} Ryo` });
   }
   return drops;

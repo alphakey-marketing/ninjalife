@@ -96,6 +96,25 @@ export function QuestScreen() {
           </div>
         );
       })}
+
+      {player.stamina === 0 && (
+        <div className="card" style={{ borderColor: '#26c6da' }}>
+          <div className="text-bold" style={{ color: '#26c6da', marginBottom: '8px' }}>
+            ⚡ スタミナ切れ！
+          </div>
+          <div className="text-small text-gray" style={{ marginBottom: '8px' }}>
+            スタミナが0です。待つか翠玉で即時回復できます。
+          </div>
+          <button
+            className="btn btn-primary"
+            style={{ borderColor: '#26c6da', color: '#26c6da' }}
+            disabled={(player.jade ?? 0) < 30}
+            onClick={() => dispatch({ type: 'SPEND_JADE', itemId: 'JADE_STAMINA_REFILL' })}
+          >
+            💎 30 翠玉で全回復 {(player.jade ?? 0) < 30 && '（翠玉不足）'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

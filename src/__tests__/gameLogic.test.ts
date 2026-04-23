@@ -57,6 +57,8 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     killStreak: 0,
     lastWorldBossKills: {},
     clearedBossIds: [],
+    jade: 0,
+    lastLoginDate: '',
     ...overrides,
   };
 }

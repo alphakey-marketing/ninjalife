@@ -8,7 +8,58 @@ import type { BloodlineDefinition, Element, EnemyDefinition, GearDefinition, Ite
 // 5 → 6: Added skillMasteries on player; element on bloodlines/enemies
 // 6 → 7: Replaced lastFreeRestDate with lastFreeRestTimestamp; added lastVitalRecovery for passive HP/Chakra regen
 // 7 → 8: Added killStreak, lastWorldBossKills on player; pendingDrops, isWorldBoss, targetCount on battle; WorldMap feature
-export const SAVE_VERSION = 8;
+// 8 → 9: Added jade currency and lastLoginDate; Jade Shop system
+export const SAVE_VERSION = 9;
+
+export interface JadeShopItem {
+  id: string;
+  name: string;
+  nameJp: string;
+  jadeCost: number;
+  description: string;
+  descriptionJp: string;
+  effect: 'STAMINA_REFILL' | 'HP_MD_RESTORE' | 'EXTRA_SPIN' | 'REST_CD_SKIP';
+}
+
+export const JADE_SHOP_ITEMS: JadeShopItem[] = [
+  {
+    id: 'JADE_STAMINA_REFILL',
+    name: 'Stamina Full Refill',
+    nameJp: 'スタミナ全回復',
+    jadeCost: 30,
+    description: 'Fully restore all stamina immediately.',
+    descriptionJp: 'スタミナを即時全回復する。',
+    effect: 'STAMINA_REFILL',
+  },
+  {
+    id: 'JADE_HP_MD_RESTORE',
+    name: 'HP & Chakra Full Restore',
+    nameJp: 'HP・チャクラ全回復',
+    jadeCost: 15,
+    description: 'Fully restore HP and Chakra.',
+    descriptionJp: 'HPとチャクラを即時全回復する。',
+    effect: 'HP_MD_RESTORE',
+  },
+  {
+    id: 'JADE_EXTRA_SPIN',
+    name: 'Extra Spin Ticket',
+    nameJp: '追加スピンチケット',
+    jadeCost: 50,
+    description: 'Gain one free Spin.',
+    descriptionJp: 'スピンを1回無料で行う。',
+    effect: 'EXTRA_SPIN',
+  },
+  {
+    id: 'JADE_REST_CD_SKIP',
+    name: 'Free Rest Cooldown Skip',
+    nameJp: '無料休息CD短縮',
+    jadeCost: 10,
+    description: 'Skip the free rest cooldown.',
+    descriptionJp: '無料休息のクールダウンをスキップする。',
+    effect: 'REST_CD_SKIP',
+  },
+];
+
 export const MD_REGEN_BASE = 5;
 export const MAX_STAMINA = 100;
 export const STAMINA_REST_FREE = 50;

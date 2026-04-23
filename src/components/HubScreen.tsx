@@ -31,6 +31,7 @@ export function HubScreen() {
         <div className="flex-row">
           <span className={`rank-badge rank-${player.rank}`}>{RANK_DISPLAY[player.rank]}</span>
           <span className="text-gold">💰 {player.ryo} Ryo</span>
+          <span className="text-small" style={{ color: '#26c6da' }}>💎 {player.jade ?? 0}</span>
         </div>
       </div>
 
