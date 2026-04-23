@@ -1,8 +1,39 @@
 export type Rarity = 'COMMON' | 'RARE' | 'LEGENDARY';
+export type Element = 'FIRE' | 'WATER' | 'LIGHTNING' | 'EARTH' | 'WIND';
 export type QuestType = 'GRIND' | 'ELITE' | 'BOSS';
 export type Rank = 'E' | 'D' | 'C';
 export type ActionType = 'ATTACK' | 'SKILL' | 'TOGGLE_MODE' | 'RUN';
-export type Screen = 'HUB' | 'QUEST' | 'COMBAT' | 'SPIN' | 'STATUS';
+export type Screen = 'HUB' | 'QUEST' | 'COMBAT' | 'SPIN' | 'STATUS' | 'CLINIC' | 'SHOP' | 'GEAR' | 'INTRO' | 'MAP';
+export type QuestRepeatType = 'UNLIMITED' | 'DAILY' | 'ONCE';
+export type GearSlot = 'WEAPON' | 'ARMOR' | 'ACCESSORY';
+export type GearRarity = 'COMMON' | 'RARE' | 'LEGENDARY';
+export type ItemType = 'POTION' | 'CHAKRA_PILL' | 'SCROLL';
+
+export interface ItemEffect {
+  hpRestore?: number;
+  hpRestorePercent?: number;
+  mdRestore?: number;
+  mdRestorePercent?: number;
+  staminaRestore?: number;
+  atkMultiplier?: number;
+  defMultiplier?: number;
+  spdBonus?: number;
+  buffDuration?: number;
+}
+
+export interface ItemDefinition {
+  id: string;
+  name: string;
+  description: string;
+  type: ItemType;
+  price: number;
+  effect: ItemEffect;
+  usableInCombat: boolean;
+  usableOutOfCombat: boolean;
+}
+
+export interface InventoryItem { itemId: string; quantity: number; }
+export interface ActiveBuff { itemId: string; remainingTurns: number; atkMultiplier?: number; defMultiplier?: number; spdBonus?: number; }
 
 export interface PlayerStats {
   level: number;
@@ -28,6 +59,31 @@ export interface OwnedBloodline {
   mastery: number;
 }
 
+export interface GearStats {
+  atkBonus?: number;
+  defBonus?: number;
+  hpBonus?: number;
+  spdBonus?: number;
+  mdRegenBonus?: number;
+  hpRegenPerTurn?: number;
+}
+
+export interface GearDefinition {
+  id: string;
+  name: string;
+  description: string;
+  slot: GearSlot;
+  rarity: GearRarity;
+  price: number;
+  stats: GearStats;
+}
+
+export interface EquippedGear {
+  weapon: string | null;
+  armor: string | null;
+  accessory: string | null;
+}
+
 export interface PlayerState {
   name: string;
   rank: Rank;
@@ -45,6 +101,22 @@ export interface PlayerState {
   currentQuestId: string | null;
   bossDefeatedThisRank: boolean;
   completedQuestIds: string[];
+  lastFreeRestTimestamp: number;
+  lastVitalRecovery: number;
+  inventory: InventoryItem[];
+  activeBuffs: ActiveBuff[];
+  questResetTimestamps: Record<string, number>;
+  stamina: number;
+  maxStamina: number;
+  lastStaminaRecovery: number;
+  ownedGearIds: string[];
+  equippedGear: EquippedGear;
+  skillMasteries: Record<string, number>;
+  killStreak: number;
+  lastWorldBossKills: Record<string, number>;
+  clearedBossIds: string[];
+  jade: number;
+  lastLoginDate: string; // ISO date string "YYYY-MM-DD" for daily login
 }
 
 export interface SkillEffectNumbers {
@@ -56,6 +128,11 @@ export interface SkillEffectNumbers {
   burnDuration?: number;
   healSelfPercent?: number;
   mdRestore?: number;
+  ignoreDefense?: boolean;
+  skipEnemyTurn?: boolean;
+  multiHitCount?: number;
+  reflectDamagePercent?: number;
+  spdDebuff?: boolean;
 }
 
 export interface SkillDefinition {
@@ -74,6 +151,8 @@ export interface BloodlineDefinition {
   name: string;
   rarity: Rarity;
   description: string;
+  element?: Element;
+  advancedNature?: string;
   passive: {
     atkMultiplier?: number;
     hpMultiplier?: number;
@@ -116,9 +195,12 @@ export interface QuestDefinition {
   description: string;
   type: QuestType;
   requiredLevel: number;
+  requiredRank: Rank;
   targetEnemyId: string;
   targetCount: number;
   reward: QuestReward;
+  repeatType: QuestRepeatType;
+  staminaCost: number;
 }
 
 export interface EnemyStats {
@@ -133,8 +215,42 @@ export interface EnemyDefinition {
   name: string;
   description: string;
   stats: EnemyStats;
-  specialAbility?: 'GUARD' | 'CHARGE';
+  element?: Element;
+  specialAbility?: 'GUARD' | 'CHARGE' | 'HEAL' | 'MULTI_HIT' | 'DEBUFF';
   specialAbilityChance?: number;
+}
+
+export interface WorldZoneDefinition {
+  id: string;
+  name: string;
+  emoji: string;
+  requiredRank: Rank;
+  requiredLevel: number;
+  staminaCost: number;
+  description: string;
+  enemyIds: string[];
+  eliteEnemyId: string;
+  bossId: string;
+}
+
+export interface WorldBossDefinition {
+  id: string;
+  name: string;
+  emoji: string;
+  tier: 'ZONE' | 'WORLD' | 'LEGENDARY';
+  cooldownMs: number;
+  enemyId: string;
+  guaranteedDrops: string[];
+  signatureBloodlineId?: string;
+}
+
+export interface BattleDrop {
+  type: 'RYO' | 'ITEM' | 'GEAR' | 'BLOODLINE_SCROLL';
+  ryo?: number;
+  itemId?: string;
+  gearId?: string;
+  bloodlineId?: string;
+  label: string;
 }
 
 export interface RankDefinition {
@@ -154,9 +270,11 @@ export interface SkillCooldownState {
 }
 
 export interface StatusEffect {
-  type: 'BURN';
-  damagePerTurn: number;
+  type: 'BURN' | 'ATK_DOWN' | 'SPD_DOWN';
+  damagePerTurn?: number;
   remainingTurns: number;
+  atkDebuffPercent?: number;
+  spdDebuffAmount?: number;
 }
 
 export interface BattleState {
@@ -167,6 +285,7 @@ export interface BattleState {
     statusEffects: StatusEffect[];
     isGuarding: boolean;
     chargeReady: boolean;
+    isSkippingTurn?: boolean;
   };
   skillCooldowns: SkillCooldownState[];
   turnNumber: number;
@@ -174,5 +293,9 @@ export interface BattleState {
   phase: 'PLAYER_TURN' | 'ENEMY_TURN' | 'VICTORY' | 'DEFEAT' | 'QUEST_COMPLETE';
   enemiesDefeated: number;
   questId: string;
+  targetCount: number;
   modeCooldown: number;
+  playerStatusEffects: StatusEffect[];
+  pendingDrops: BattleDrop[];
+  isWorldBoss: boolean;
 }
